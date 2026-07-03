@@ -7,9 +7,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Colors } from '../constants/colors';
 import { fetchCampaigns } from '../lib/api';
 import { formatUsdc, usdcPercent } from '../lib/format';
@@ -17,7 +17,7 @@ import { getWalletAddress } from '../lib/blockchain';
 
 export default function AllCampaigns() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  useEffect(() => { getWalletAddress().then(setWalletAddress); }, []);
+  useFocusEffect(useCallback(() => { getWalletAddress().then(setWalletAddress); }, []));
 
   const { data: allCampaigns, isLoading, isError } = useQuery({
     queryKey: ['campaigns'],

@@ -13,9 +13,9 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../constants/colors';
 import { fetchCampaigns, fetchDonations, fetchUser, postImpactUpdate, type DonationRecord, type Campaign } from '../lib/api';
@@ -50,7 +50,7 @@ export function donationRecordToIncomingRow(d: DonationRecord, campaignName: str
 
 export default function RecipientDashboard() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  useEffect(() => { getWalletAddress().then(setWalletAddress); }, []);
+  useFocusEffect(useCallback(() => { getWalletAddress().then(setWalletAddress); }, []));
 
   const { data: campaigns, isLoading, isError } = useQuery({
     queryKey: ['campaigns'],

@@ -63,6 +63,14 @@ export async function fetchCampaign(id: string): Promise<Campaign> {
   return data;
 }
 
+// ─── Dev / test faucet ─────────────────────────────────────────────────────────
+// Testnet-only: tops up the signed-in wallet with mock USDC so new donor
+// accounts don't need to be funded by hand. Backend 404s this in production.
+
+export async function fundWalletIfNeeded(): Promise<void> {
+  await api.post('/dev/fund-wallet');
+}
+
 // ─── Donation endpoints ───────────────────────────────────────────────────────
 
 export interface DonationRecord {
@@ -78,6 +86,21 @@ export interface DonationRecord {
   block_timestamp: string;
   block_number: number;
   created_at: string;
+}
+
+// The backend's on-chain event listener indexes donations asynchronously
+// (polls the chain every few seconds) — it can lag behind a UserOperation
+// that just confirmed. Poll until the donation is actually in the DB before
+// declaring the donation flow done, so dashboards don't show stale data.
+export async function waitForDonationIndexed(txHash: string): Promise<void> {
+  for (let attempt = 0; attempt < 15; attempt++) {
+    try {
+      await api.get<DonationRecord>(`/donations/${txHash}`);
+      return;
+    } catch {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
 }
 
 export async function fetchDonations(params: {

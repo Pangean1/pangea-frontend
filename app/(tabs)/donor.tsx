@@ -7,9 +7,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Colors } from '../../constants/colors';
 import { fetchCampaigns, fetchDonations, fetchImpactUpdates } from '../../lib/api';
 import { formatUsdc, formatTimeAgo, shortenAddress } from '../../lib/format';
@@ -29,7 +29,10 @@ const TRACKER_STEPS = ['Initiated', 'On-chain', 'Arriving', 'Notified', 'Impact\
 
 export default function DonorDashboard() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  useEffect(() => { getWalletAddress().then(setWalletAddress); }, []);
+  // Re-resolve on every focus, not just mount — otherwise switching to a
+  // different signed-in account and returning to this tab keeps showing
+  // the previous account's wallet/donations.
+  useFocusEffect(useCallback(() => { getWalletAddress().then(setWalletAddress); }, []));
 
   const { data: campaigns, isLoading: campaignsLoading, isError: campaignsError } = useQuery({
     queryKey: ['campaigns'],

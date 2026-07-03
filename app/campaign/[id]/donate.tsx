@@ -31,6 +31,7 @@ const STATUS_LABELS: Record<DonationStatus, string> = {
   waiting_approve:'Waiting for approval...',
   donating:       'Sending donation...',
   confirming:     'Confirming on-chain...',
+  syncing:        'Recording donation...',
   done:           'Done!',
 };
 
@@ -83,7 +84,7 @@ export default function DonateScreen() {
       } else if (msg.includes('Timed out')) {
         setTxError('Transaction is taking longer than expected. Check Polygonscan for your wallet address to see if it went through.');
       } else {
-        setTxError('Transaction failed. Please try again.');
+        setTxError(`Transaction failed: ${msg}`);
       }
     }
   };

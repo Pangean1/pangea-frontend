@@ -8,6 +8,7 @@ import {
 import { polygonAmoy } from 'viem/chains';
 import { getWalletPrivateKey } from './auth';
 import { getSmartAccountClient } from './zerodev';
+import { fundWalletIfNeeded, waitForDonationIndexed } from './api';
 
 const RPC_URL = process.env.EXPO_PUBLIC_AMOY_RPC_URL!;
 const CONTRACT_ADDRESS = process.env.EXPO_PUBLIC_CONTRACT_ADDRESS as Address;
@@ -64,6 +65,7 @@ export type DonationStatus =
   | 'waiting_approve'
   | 'donating'
   | 'confirming'
+  | 'syncing'
   | 'done';
 
 export async function executeDonation(
@@ -85,6 +87,18 @@ export async function executeDonation(
   const amountWei = parseUnits(amountUsdc.toFixed(6), 6);
 
   onStatus('checking');
+  const balance = await publicClient.readContract({
+    address: USDC_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: [smartAccountAddress as Address],
+  });
+  if (balance < amountWei) {
+    // Testnet-only: silently top up the wallet with mock USDC so new donor
+    // accounts can donate without a manual mint. No-op in production.
+    await fundWalletIfNeeded();
+  }
+
   const allowance = await publicClient.readContract({
     address: USDC_ADDRESS,
     abi: ERC20_ABI,
@@ -119,9 +133,13 @@ export async function executeDonation(
     hash: userOpHash,
     timeout: 300_000,
   });
+  const txHash = receipt.receipt.transactionHash;
+
+  onStatus('syncing');
+  await waitForDonationIndexed(txHash);
 
   onStatus('done');
-  return receipt.receipt.transactionHash;
+  return txHash;
 }
 
 export function getExplorerUrl(txHash: string): string {
