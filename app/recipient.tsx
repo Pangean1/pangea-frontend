@@ -10,17 +10,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../constants/colors';
-import { fetchCampaigns } from '../lib/api';
-import { formatUsdc, usdcPercent, shortenAddress } from '../lib/format';
+import { fetchCampaigns, fetchDonations, fetchUser, postImpactUpdate, type DonationRecord, type Campaign } from '../lib/api';
+import { formatUsdc, usdcPercent, shortenAddress, formatTimeAgo, formatMonthYear } from '../lib/format';
+import { getWalletAddress } from '../lib/blockchain';
 
-// ─── Mock incoming donations ──────────────────────────────────────────────────
+// ─── Real data mapping ─────────────────────────────────────────────────────────
 
 export interface IncomingDonation {
   id: string;
@@ -30,36 +32,67 @@ export interface IncomingDonation {
   campaign: string;
   amount: string;
   time: string;
-  acknowledged: boolean;
 }
 
-export const INCOMING_DONATIONS: IncomingDonation[] = [
-  { id: '1', donorInitials: 'A', donorColor: '#2DD4BF', donorLabel: 'Anonymous donor', campaign: 'Emergency Food Relief — Sudan', amount: '$120.00', time: '2 min ago', acknowledged: false },
-  { id: '2', donorInitials: 'M', donorColor: '#60A5FA', donorLabel: 'Anonymous donor', campaign: 'Flood Recovery — Bangladesh', amount: '$50.00', time: '1 hour ago', acknowledged: false },
-  { id: '3', donorInitials: 'A', donorColor: '#A78BFA', donorLabel: 'Anonymous donor', campaign: 'Solar Panels — Kenya', amount: '$75.00', time: 'Yesterday', acknowledged: true },
-  { id: '4', donorInitials: 'A', donorColor: '#F59E0B', donorLabel: 'Anonymous donor', campaign: 'Emergency Food Relief — Sudan', amount: '$200.00', time: '3 days ago', acknowledged: true },
-];
+export function donationRecordToIncomingRow(d: DonationRecord, campaignName: string): IncomingDonation {
+  return {
+    id: d.id,
+    donorInitials: d.donor_address.slice(2, 4).toUpperCase(),
+    donorColor: Colors.teal,
+    donorLabel: shortenAddress(d.donor_address),
+    campaign: campaignName,
+    amount: formatUsdc(d.amount_wei),
+    time: formatTimeAgo(d.block_timestamp),
+  };
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function RecipientDashboard() {
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  useEffect(() => { getWalletAddress().then(setWalletAddress); }, []);
+
   const { data: campaigns, isLoading, isError } = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => fetchCampaigns(),
+  });
+  const myCampaigns: Campaign[] = walletAddress
+    ? (campaigns ?? []).filter(c => c.recipient_address.toLowerCase() === walletAddress.toLowerCase())
+    : [];
+
+  const { data: user } = useQuery({
+    queryKey: ['user', walletAddress],
+    queryFn: () => fetchUser(walletAddress!),
+    enabled: !!walletAddress,
+    retry: false,
+  });
+
+  const { data: incomingDonationsData } = useQuery({
+    queryKey: ['donations', 'recipient', walletAddress],
+    queryFn: () => fetchDonations({ recipient_address: walletAddress!, limit: 50 }),
+    enabled: !!walletAddress,
+  });
+  const incomingDonations: IncomingDonation[] = (incomingDonationsData?.items ?? []).map(d => {
+    const campaignName = myCampaigns.find(c => c.on_chain_id === d.on_chain_campaign_id)?.name
+      ?? 'Unknown campaign';
+    return donationRecordToIncomingRow(d, campaignName);
   });
 
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [updateText, setUpdateText] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState('');
   const [updateSent, setUpdateSent] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
 
-  const totalReceivedUsd = INCOMING_DONATIONS.reduce((sum, d) => {
-    return sum + parseFloat(d.amount.replace('$', ''));
-  }, 0);
+  const totalReceivedWei = (incomingDonationsData?.items ?? [])
+    .reduce((sum, d) => sum + BigInt(d.amount_wei), 0n)
+    .toString();
+  const totalReceivedCount = incomingDonationsData?.total ?? 0;
 
-  function handleSignOut() {
+  function handleBack() {
     router.replace('/');
   }
 
@@ -68,16 +101,30 @@ export default function RecipientDashboard() {
     setSelectedCampaign('');
     setMediaUri(null);
     setMediaType(null);
+    setPostError(null);
   }
 
-  function handlePostUpdate() {
-    if (!updateText.trim()) return;
-    setUpdateSent(true);
-    setTimeout(() => {
-      setUpdateModalVisible(false);
-      resetModal();
-      setUpdateSent(false);
-    }, 1800);
+  async function handlePostUpdate() {
+    if (!updateText.trim() || !selectedCampaign || posting) return;
+    setPosting(true);
+    setPostError(null);
+    try {
+      await postImpactUpdate(
+        selectedCampaign,
+        updateText.trim(),
+        mediaUri ? { uri: mediaUri, type: mediaType ?? 'image' } : undefined
+      );
+      setUpdateSent(true);
+      setTimeout(() => {
+        setUpdateModalVisible(false);
+        resetModal();
+        setUpdateSent(false);
+      }, 1800);
+    } catch (err: any) {
+      setPostError(err?.response?.data?.detail ?? 'Could not send update. Please try again.');
+    } finally {
+      setPosting(false);
+    }
   }
 
   async function handlePickMedia() {
@@ -93,10 +140,10 @@ export default function RecipientDashboard() {
     }
   }
 
-  const visibleCampaigns = campaigns?.slice(0, 2) ?? [];
-  const visibleDonations = INCOMING_DONATIONS.slice(0, 2);
-  const hasMoreCampaigns = (campaigns?.length ?? 0) > 2;
-  const hasMoreDonations = INCOMING_DONATIONS.length > 2;
+  const visibleCampaigns = myCampaigns.slice(0, 2);
+  const visibleDonations = incomingDonations.slice(0, 2);
+  const hasMoreCampaigns = myCampaigns.length > 2;
+  const hasMoreDonations = incomingDonations.length > 2;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -104,18 +151,21 @@ export default function RecipientDashboard() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Avatar initials="RK" color={Colors.warning} size={40} />
+          <Avatar initials={walletAddress ? walletAddress.slice(2, 4).toUpperCase() : '—'} color={Colors.warning} size={40} />
           <View>
             <Text style={styles.headerName}>Beneficiary</Text>
-            <Text style={styles.headerRole}>Beneficiary · {shortenAddress('0xA1b2C3d4E5f6A7b8C9d0E1f2A3b4C5d6E7f8A9b0')} · member since Jan 2026</Text>
+            <Text style={styles.headerRole}>
+              {walletAddress ? shortenAddress(walletAddress) : '—'}
+              {user ? ` · member since ${formatMonthYear(user.created_at)}` : ''}
+            </Text>
           </View>
         </View>
 
         {/* Stats row */}
         <View style={styles.statsRow}>
-          <StatCard label="Total received" value={`$${totalReceivedUsd.toFixed(0)}`} sub="since Jan 2026" teal />
-          <StatCard label="Campaigns" value={String(campaigns?.length ?? '—')} sub="on Amoy testnet" />
-          <StatCard label="Updates" value="2" sub="impact updates" />
+          <StatCard label="Total received" value={formatUsdc(totalReceivedWei)} sub={`across ${totalReceivedCount} donations`} teal />
+          <StatCard label="Campaigns" value={String(myCampaigns.length)} sub="on Amoy testnet" />
+          <StatCard label="Updates" value="0" sub="impact updates" />
         </View>
 
         {/* My campaigns */}
@@ -130,6 +180,9 @@ export default function RecipientDashboard() {
           </View>
           {isLoading && <ActivityIndicator color={Colors.teal} style={{ paddingVertical: 20 }} />}
           {isError && <Text style={styles.errorText}>Could not load campaigns.</Text>}
+          {!isLoading && !isError && visibleCampaigns.length === 0 && (
+            <Text style={styles.emptyText}>No campaigns yet.</Text>
+          )}
           {visibleCampaigns.map(c => {
             const percent = usdcPercent(c.total_raised_wei, c.goal_wei);
             const raised = formatUsdc(c.total_raised_wei);
@@ -162,6 +215,9 @@ export default function RecipientDashboard() {
               </TouchableOpacity>
             )}
           </View>
+          {visibleDonations.length === 0 && (
+            <Text style={styles.emptyText}>No donations yet.</Text>
+          )}
           {visibleDonations.map(d => (
             <DonationRow key={d.id} item={d} />
           ))}
@@ -178,7 +234,16 @@ export default function RecipientDashboard() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => setUpdateModalVisible(true)}
+            onPress={() => {
+              if (myCampaigns.length === 0) {
+                Alert.alert(
+                  'No campaigns yet',
+                  'You need to create a campaign before you can post an impact update for it.'
+                );
+                return;
+              }
+              setUpdateModalVisible(true);
+            }}
             activeOpacity={0.85}
           >
             <Text style={styles.actionButtonText}>Updates</Text>
@@ -192,9 +257,9 @@ export default function RecipientDashboard() {
           </Text>
         </View>
 
-        {/* Sign out */}
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Sign out</Text>
+        {/* Back */}
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -230,7 +295,7 @@ export default function RecipientDashboard() {
 
                 <Text style={styles.modalLabel}>Campaign</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.campaignPills}>
-                  {campaigns?.map(c => (
+                  {myCampaigns.map(c => (
                     <TouchableOpacity
                       key={c.id}
                       style={[styles.campaignPill, selectedCampaign === c.id && styles.campaignPillActive]}
@@ -283,12 +348,17 @@ export default function RecipientDashboard() {
                   </TouchableOpacity>
                 )}
 
+                {postError && <Text style={styles.postErrorText}>{postError}</Text>}
+
                 <TouchableOpacity
-                  style={[styles.sendButton, (!updateText.trim() || !selectedCampaign) && styles.sendButtonDisabled]}
+                  style={[styles.sendButton, (!updateText.trim() || !selectedCampaign || posting) && styles.sendButtonDisabled]}
                   onPress={handlePostUpdate}
                   activeOpacity={0.85}
+                  disabled={!updateText.trim() || !selectedCampaign || posting}
                 >
-                  <Text style={styles.sendButtonText}>Send update to donors</Text>
+                  <Text style={styles.sendButtonText}>
+                    {posting ? 'Sending…' : 'Send update to donors'}
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
@@ -392,10 +462,11 @@ const styles = StyleSheet.create({
   transparencyNote: { paddingHorizontal: 4 },
   transparencyText: { fontSize: 12, color: Colors.text.muted, lineHeight: 18 },
 
-  signOutButton: { alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, marginTop: 4 },
-  signOutText: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary },
+  backButton: { alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, marginTop: 4 },
+  backText: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary },
 
   errorText: { fontSize: 13, color: Colors.error, paddingVertical: 12 },
+  emptyText: { fontSize: 13, color: Colors.text.muted, paddingVertical: 12, textAlign: 'center' },
 
   // Modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
@@ -424,6 +495,7 @@ const styles = StyleSheet.create({
   mediaRemove: { padding: 10, alignItems: 'center', backgroundColor: Colors.bgCardAlt },
   mediaRemoveText: { fontSize: 13, color: Colors.error, fontWeight: '600' },
 
+  postErrorText: { fontSize: 12, color: Colors.error, textAlign: 'center' },
   sendButton: { backgroundColor: Colors.teal, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   sendButtonDisabled: { backgroundColor: Colors.bgCardAlt },
   sendButtonText: { fontSize: 15, fontWeight: '800', color: Colors.text.inverse },

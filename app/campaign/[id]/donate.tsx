@@ -8,26 +8,40 @@ import {
   Platform,
   ScrollView,
   Image,
+  Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Colors } from '../../../constants/colors';
 import { fetchCampaign } from '../../../lib/api';
 import { shortenAddress } from '../../../lib/format';
-import { queryClient } from '../../../lib/queryClient';
-import type { SessionDonation } from '../../../lib/sessionDonations';
 import { getCampaignMedia } from '../../../lib/campaignMedia';
+import { executeDonation, getExplorerUrl, type DonationStatus } from '../../../lib/blockchain';
 
 type Step = 'enter' | 'confirm' | 'success';
 
 const PRESET_AMOUNTS = ['10', '25', '50', '100'];
 
+const STATUS_LABELS: Record<DonationStatus, string> = {
+  checking:       'Checking wallet...',
+  approving:      'Approving USDC...',
+  waiting_approve:'Waiting for approval...',
+  donating:       'Sending donation...',
+  confirming:     'Confirming on-chain...',
+  done:           'Done!',
+};
+
 export default function DonateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>('enter');
   const [amount, setAmount] = useState('');
+  const [txHash, setTxHash] = useState<string>('');
+  const [txStatus, setTxStatus] = useState<DonationStatus | null>(null);
+  const [txError, setTxError] = useState<string>('');
 
   const { data: campaign } = useQuery({
     queryKey: ['campaign', id],
@@ -39,15 +53,63 @@ export default function DonateScreen() {
   const isValidAmount = !isNaN(numericAmount) && numericAmount >= 1;
   const campaignMedia = getCampaignMedia(id ?? '');
 
+  const handleConfirm = async () => {
+    if (!campaign) return;
+    setTxError('');
+    setTxStatus('checking');
+
+    try {
+      const hash = await executeDonation(
+        campaign.on_chain_id,
+        numericAmount,
+        '',
+        setTxStatus,
+      );
+      setTxHash(hash);
+      setStep('success');
+      // The campaign's raised amount/percent and the donor's history won't
+      // reflect this donation until these are invalidated — otherwise the
+      // 5-minute query staleTime leaves stale numbers on screen.
+      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['donations'] });
+    } catch (e: any) {
+      setTxStatus(null);
+      const msg: string = e?.message ?? 'Transaction failed.';
+      if (msg.includes('insufficient') || msg.includes('balance')) {
+        setTxError('Insufficient USDC balance in your wallet.');
+      } else if (msg.includes('user rejected') || msg.includes('denied')) {
+        setTxError('Transaction cancelled.');
+      } else if (msg.includes('Timed out')) {
+        setTxError('Transaction is taking longer than expected. Check Polygonscan for your wallet address to see if it went through.');
+      } else {
+        setTxError('Transaction failed. Please try again.');
+      }
+    }
+  };
+
   if (step === 'success') {
-    return <SuccessScreen campaignName={campaign?.name ?? ''} amount={amount} onDone={() => router.replace('/(tabs)')} />;
+    return (
+      <SuccessScreen
+        campaignName={campaign?.name ?? ''}
+        amount={amount}
+        txHash={txHash}
+        onDone={() => router.replace('/donor')}
+      />
+    );
   }
 
   if (step === 'confirm') {
+    const isSending = txStatus !== null;
+
     return (
       <SafeAreaView style={styles.screen}>
-        <TouchableOpacity style={styles.backButton} onPress={() => setStep('enter')} activeOpacity={0.7}>
-          <Text style={styles.backText}>← Back</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => { if (!isSending) setStep('enter'); }}
+          activeOpacity={isSending ? 1 : 0.7}
+        >
+          <Text style={[styles.backText, isSending && styles.backTextDisabled]}>← Back</Text>
         </TouchableOpacity>
 
         <ScrollView contentContainerStyle={styles.scroll}>
@@ -70,30 +132,39 @@ export default function DonateScreen() {
             </Text>
           </View>
 
+          {txError ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{txError}</Text>
+            </View>
+          ) : null}
+
+          {isSending ? (
+            <View style={styles.statusBox}>
+              <ActivityIndicator size="small" color={Colors.teal} style={{ marginRight: 10 }} />
+              <Text style={styles.statusText}>{STATUS_LABELS[txStatus!]}</Text>
+            </View>
+          ) : null}
+
           <TouchableOpacity
-            style={styles.confirmButton}
-            onPress={() => {
-              const donation: SessionDonation = {
-                id: Date.now().toString(),
-                campaignName: campaign?.name ?? '',
-                recipientAddress: campaign?.recipient_address ?? '',
-                amount: numericAmount.toFixed(2),
-              };
-              queryClient.setQueryData<SessionDonation[]>(
-                ['sessionDonations'],
-                prev => [donation, ...(prev ?? [])],
-              );
-              setStep('success');
-            }}
+            style={[styles.confirmButton, isSending && styles.confirmButtonDisabled]}
+            onPress={handleConfirm}
+            disabled={isSending}
             activeOpacity={0.85}
           >
-            <Text style={styles.confirmButtonText}>Confirm — send ${numericAmount.toFixed(2)} USDC</Text>
+            {isSending ? (
+              <ActivityIndicator size="small" color={Colors.text.inverse} />
+            ) : (
+              <Text style={styles.confirmButtonText}>
+                Confirm — send ${numericAmount.toFixed(2)} USDC
+              </Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     );
   }
 
+  // Enter amount step
   return (
     <SafeAreaView style={styles.screen}>
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.7}>
@@ -108,7 +179,6 @@ export default function DonateScreen() {
           <Text style={styles.pageTitle}>Donate to</Text>
           <Text style={styles.campaignName}>{campaign?.name ?? '…'}</Text>
 
-          {/* Campaign media uploaded by beneficiary */}
           {campaignMedia && (
             <View style={styles.mediaCard}>
               {campaignMedia.type === 'image' ? (
@@ -123,7 +193,6 @@ export default function DonateScreen() {
             </View>
           )}
 
-          {/* Amount input */}
           <View style={styles.amountCard}>
             <Text style={styles.amountLabel}>Amount in USDC</Text>
             <View style={styles.amountInputRow}>
@@ -139,8 +208,6 @@ export default function DonateScreen() {
                 autoFocus
               />
             </View>
-
-            {/* Preset amounts */}
             <View style={styles.presets}>
               {PRESET_AMOUNTS.map(preset => (
                 <TouchableOpacity
@@ -185,23 +252,44 @@ function SummaryRow({ label, value, highlight }: { label: string; value: string;
   );
 }
 
-function SuccessScreen({ campaignName, amount, onDone }: { campaignName: string; amount: string; onDone: () => void }) {
+function SuccessScreen({
+  campaignName,
+  amount,
+  txHash,
+  onDone,
+}: {
+  campaignName: string;
+  amount: string;
+  txHash: string;
+  onDone: () => void;
+}) {
   return (
     <SafeAreaView style={styles.screen}>
-      <View style={styles.successContainer}>
+      <ScrollView contentContainerStyle={styles.successContainer}>
         <View style={styles.successIcon}>
           <Text style={styles.successIconText}>✓</Text>
         </View>
         <Text style={styles.successTitle}>Donation sent!</Text>
-        <Text style={styles.successAmount}>${parseFloat(amount).toFixed(2)} USDC</Text>
+        <Text style={styles.successAmount}>${parseFloat(amount).toFixed(2)}</Text>
         <Text style={styles.successCampaign}>{campaignName}</Text>
         <Text style={styles.successNote}>
-          Your donation is on its way on-chain. You'll be notified when the recipient confirms it.
+          Your donation is confirmed on-chain. 100% reached the recipient.
         </Text>
+
+        {txHash ? (
+          <TouchableOpacity
+            style={styles.explorerButton}
+            onPress={() => Linking.openURL(getExplorerUrl(txHash))}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.explorerButtonText}>View on Polygonscan</Text>
+          </TouchableOpacity>
+        ) : null}
+
         <TouchableOpacity style={styles.doneButton} onPress={onDone} activeOpacity={0.85}>
           <Text style={styles.doneButtonText}>Back to dashboard</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -220,6 +308,9 @@ const styles = StyleSheet.create({
     color: Colors.teal,
     fontWeight: '600',
   },
+  backTextDisabled: {
+    color: Colors.text.muted,
+  },
   scroll: {
     padding: 20,
     gap: 16,
@@ -236,8 +327,6 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     marginTop: -8,
   },
-
-  // Amount input
   amountCard: {
     backgroundColor: Colors.bgCard,
     borderRadius: 16,
@@ -294,8 +383,6 @@ const styles = StyleSheet.create({
   presetTextActive: {
     color: Colors.teal,
   },
-
-  // Campaign media
   mediaCard: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -330,8 +417,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: Colors.bgCard,
   },
-
-  // Zero fee note
   zeroFeeNote: {
     paddingHorizontal: 4,
   },
@@ -339,8 +424,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.text.muted,
   },
-
-  // Next button
   nextButton: {
     backgroundColor: Colors.teal,
     borderRadius: 16,
@@ -356,8 +439,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.text.inverse,
   },
-
-  // Summary card
   summaryCard: {
     backgroundColor: Colors.bgCard,
     borderRadius: 16,
@@ -393,8 +474,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     marginVertical: 2,
   },
-
-  // Transparency note
   transparencyNote: {
     paddingHorizontal: 4,
   },
@@ -403,24 +482,51 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     lineHeight: 18,
   },
-
-  // Confirm button
+  errorBox: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#dc2626',
+    lineHeight: 18,
+  },
+  statusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.tealBg,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.tealBorder,
+  },
+  statusText: {
+    fontSize: 14,
+    color: Colors.teal,
+    fontWeight: '600',
+  },
   confirmButton: {
     backgroundColor: Colors.teal,
     borderRadius: 16,
     paddingVertical: 18,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 4,
+    minHeight: 56,
+  },
+  confirmButtonDisabled: {
+    opacity: 0.6,
   },
   confirmButtonText: {
     fontSize: 16,
     fontWeight: '800',
     color: Colors.text.inverse,
   },
-
-  // Success screen
   successContainer: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
@@ -465,12 +571,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 8,
   },
+  explorerButton: {
+    borderWidth: 1,
+    borderColor: Colors.tealBorder,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 8,
+  },
+  explorerButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.teal,
+  },
   doneButton: {
     backgroundColor: Colors.teal,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 40,
-    marginTop: 16,
+    marginTop: 8,
   },
   doneButtonText: {
     fontSize: 16,

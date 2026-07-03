@@ -9,15 +9,23 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Colors } from '../constants/colors';
 import { fetchCampaigns } from '../lib/api';
 import { formatUsdc, usdcPercent } from '../lib/format';
+import { getWalletAddress } from '../lib/blockchain';
 
 export default function AllCampaigns() {
-  const { data: campaigns, isLoading, isError } = useQuery({
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  useEffect(() => { getWalletAddress().then(setWalletAddress); }, []);
+
+  const { data: allCampaigns, isLoading, isError } = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => fetchCampaigns(),
   });
+  const campaigns = walletAddress
+    ? allCampaigns?.filter(c => c.recipient_address.toLowerCase() === walletAddress.toLowerCase())
+    : [];
 
   return (
     <SafeAreaView style={styles.screen}>

@@ -16,10 +16,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../constants/colors';
-import { fetchCampaigns, type Campaign } from '../lib/api';
+import { fetchCampaigns, createCampaign, type Campaign } from '../lib/api';
 import { formatUsdc, usdcPercent } from '../lib/format';
 import { queryClient } from '../lib/queryClient';
-import { addLocalCampaign, removeLocalCampaign } from '../lib/localCampaigns';
+import { removeLocalCampaign } from '../lib/localCampaigns';
 import {
   setCampaignMedia,
   removeCampaignMedia,
@@ -39,17 +39,18 @@ export default function CreateCampaign() {
   const [formMediaUri, setFormMediaUri] = useState<string | null>(null);
   const [formMediaType, setFormMediaType] = useState<'image' | 'video' | null>(null);
   const [successBanner, setSuccessBanner] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // ── Existing campaign management ──────────────────────────────────────────
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [campaignMediaMap, setCampaignMediaMap] = useState<Record<string, CampaignMediaEntry>>({});
 
-  // All four fields must be filled for the button to activate
   const canCreate =
     name.trim().length > 0 &&
     description.trim().length > 0 &&
     parseFloat(goal) > 0 &&
-    formMediaUri !== null;
+    !submitting;
 
   async function handlePickFormMedia() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -64,36 +65,28 @@ export default function CreateCampaign() {
     }
   }
 
-  function handleCreate() {
-    if (!canCreate || !formMediaUri || !formMediaType) return;
-
-    const newCampaign: Campaign = {
-      id: `local_${Date.now()}`,
-      on_chain_id: 0,
-      recipient_address: '0xA1b2C3d4E5f6A7b8C9d0E1f2A3b4C5d6E7f8A9b0',
-      name: name.trim(),
-      description: description.trim(),
-      active: true,
-      total_raised_wei: '0',
-      goal_wei: String(Math.round(parseFloat(goal) * 1_000_000)),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // Link the uploaded media to this campaign's ID
-    setCampaignMedia(newCampaign.id, { uri: formMediaUri, type: formMediaType });
-
-    // Add to module store so all screens pick it up on next fetch
-    addLocalCampaign(newCampaign);
-    queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-
-    // Reset form
-    setName('');
-    setDescription('');
-    setGoal('');
-    setFormMediaUri(null);
-    setFormMediaType(null);
-    setSuccessBanner(true);
+  async function handleCreate() {
+    if (!canCreate) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await createCampaign({
+        name: name.trim(),
+        description: description.trim(),
+        goal_usd: String(parseFloat(goal)),
+      });
+      setName('');
+      setDescription('');
+      setGoal('');
+      setFormMediaUri(null);
+      setFormMediaType(null);
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      setSuccessBanner(true);
+    } catch (e: any) {
+      setSubmitError(e?.response?.data?.detail ?? e?.message ?? 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function handleDelete(id: string) {
@@ -152,6 +145,13 @@ export default function CreateCampaign() {
               >
                 <Text style={styles.successBannerDismiss}>✕</Text>
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── Error banner ──────────────────────────────────────────────── */}
+          {submitError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>{submitError}</Text>
             </View>
           )}
 
@@ -233,9 +233,12 @@ export default function CreateCampaign() {
               onPress={handleCreate}
               activeOpacity={canCreate ? 0.85 : 1}
             >
-              <Text style={[styles.createButtonText, !canCreate && styles.createButtonTextDisabled]}>
-                Create campaign
-              </Text>
+              {submitting
+                ? <ActivityIndicator color={Colors.text.inverse} />
+                : <Text style={[styles.createButtonText, !canCreate && styles.createButtonTextDisabled]}>
+                    Submit request
+                  </Text>
+              }
             </TouchableOpacity>
           </View>
 
@@ -346,6 +349,9 @@ const styles = StyleSheet.create({
   },
   successBannerText: { fontSize: 14, fontWeight: '700', color: Colors.teal, flex: 1 },
   successBannerDismiss: { fontSize: 16, color: Colors.teal, fontWeight: '700', paddingLeft: 12 },
+
+  errorBanner: { backgroundColor: Colors.errorBg, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)', paddingHorizontal: 16, paddingVertical: 12 },
+  errorBannerText: { fontSize: 14, fontWeight: '600', color: Colors.error },
 
   card: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.border, gap: 12 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: Colors.text.primary },

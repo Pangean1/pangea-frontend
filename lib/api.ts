@@ -45,10 +45,124 @@ export async function fetchCampaigns(activeOnly = true): Promise<Campaign[]> {
   return [...getLocalCampaigns(), ...data.items];
 }
 
+
+export async function createCampaign(payload: {
+  name: string;
+  description: string;
+  goal_usd: string;
+}): Promise<Campaign> {
+  const { data } = await api.post('/campaigns', payload);
+  return data;
+}
+
 export async function fetchCampaign(id: string): Promise<Campaign> {
   const { getLocalCampaign } = await import('./localCampaigns');
   const local = getLocalCampaign(id);
   if (local) return local;
   const { data } = await api.get<Campaign>(`/campaigns/${id}`);
+  return data;
+}
+
+// ─── Donation endpoints ───────────────────────────────────────────────────────
+
+export interface DonationRecord {
+  id: string;
+  tx_hash: string;
+  campaign_id: string | null;
+  on_chain_campaign_id: number;
+  donor_address: string;
+  recipient_address: string;
+  token_address: string;
+  amount_wei: string;
+  message: string;
+  block_timestamp: string;
+  block_number: number;
+  created_at: string;
+}
+
+export async function fetchDonations(params: {
+  donor_address?: string;
+  recipient_address?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ items: DonationRecord[]; total: number }> {
+  const { data } = await api.get<{ items: DonationRecord[]; total: number }>(
+    '/donations',
+    { params }
+  );
+  return data;
+}
+
+// ─── User endpoints ───────────────────────────────────────────────────────────
+
+export interface UserRecord {
+  id: string;
+  wallet_address: string;
+  fcm_token: string | null;
+  username: string | null;
+  email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function fetchUser(walletAddress: string): Promise<UserRecord> {
+  const { data } = await api.get<UserRecord>(`/users/${walletAddress}`);
+  return data;
+}
+
+// ─── Impact update endpoints ──────────────────────────────────────────────────
+
+export interface ImpactUpdateRecord {
+  id: string;
+  campaign_id: string;
+  message: string;
+  media_url: string | null;
+  media_type: 'image' | 'video' | null;
+  created_at: string;
+}
+
+export async function fetchImpactUpdates(params: {
+  donor_address?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ items: ImpactUpdateRecord[]; total: number }> {
+  const { data } = await api.get<{ items: ImpactUpdateRecord[]; total: number }>(
+    '/impact-updates',
+    { params }
+  );
+  return data;
+}
+
+export async function fetchCampaignImpactUpdates(
+  campaignId: string,
+  params: { limit?: number; offset?: number } = {}
+): Promise<{ items: ImpactUpdateRecord[]; total: number }> {
+  const { data } = await api.get<{ items: ImpactUpdateRecord[]; total: number }>(
+    `/campaigns/${campaignId}/impact-updates`,
+    { params }
+  );
+  return data;
+}
+
+export async function postImpactUpdate(
+  campaignId: string,
+  message: string,
+  media?: { uri: string; type: 'image' | 'video' }
+): Promise<ImpactUpdateRecord> {
+  const form = new FormData();
+  form.append('message', message);
+  if (media) {
+    const filename = media.uri.split('/').pop() ?? 'upload';
+    form.append('media', {
+      uri: media.uri,
+      name: filename,
+      type: media.type === 'video' ? 'video/mp4' : 'image/jpeg',
+    } as unknown as Blob);
+  }
+  const { data } = await api.post<ImpactUpdateRecord>(
+    `/campaigns/${campaignId}/impact-updates`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
   return data;
 }

@@ -1,8 +1,8 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Colors } from '../constants/colors';
-import { formatUsdc, usdcPercent, shortenAddress } from './format';
-import type { Campaign } from './api';
+import { formatUsdc, usdcPercent, shortenAddress, formatTimeAgo } from './format';
+import type { Campaign, DonationRecord, ImpactUpdateRecord } from './api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,38 +25,42 @@ export interface ImpactUpdate {
   name: string;
   time: string;
   message: string;
-  hasPhoto?: boolean;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
   donationRef: string;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Real data mapping ─────────────────────────────────────────────────────────
 
-export const MY_DONATIONS: Donation[] = [
-  { id: '1', initials: 'CW', avatarColor: '#2DD4BF', name: '', campaign: 'Clean Water — Malawi', amount: '$120.00', time: '2 min ago', status: 'In transit' },
-  { id: '2', initials: 'MA', avatarColor: '#F59E0B', name: '', campaign: 'Medical Aid — Ghana', amount: '$75.00', time: '3 days ago', status: 'Update received' },
-  { id: '3', initials: 'SS', avatarColor: '#60A5FA', name: '', campaign: 'School Supplies — Nigeria', amount: '$50.00', time: '1 week ago', status: 'Delivered' },
-  { id: '4', initials: 'FR', avatarColor: '#A78BFA', name: '', campaign: 'Food Relief — Sudan', amount: '$100.00', time: '2 weeks ago', status: 'Delivered' },
-];
+// Funds transfer straight to the recipient wallet in the same on-chain tx, so
+// every recorded donation has genuinely been delivered — there's no partial
+// "in transit" state on-chain. 'Update received' is reserved for donations
+// with a linked beneficiary impact update, which isn't built yet.
+export function donationRecordToRow(d: DonationRecord, campaignName: string): Donation {
+  return {
+    id: d.id,
+    initials: campaignName.slice(0, 2).toUpperCase(),
+    avatarColor: Colors.teal,
+    name: shortenAddress(d.recipient_address),
+    campaign: campaignName,
+    amount: formatUsdc(d.amount_wei),
+    time: formatTimeAgo(d.block_timestamp),
+    status: 'Delivered',
+  };
+}
 
-export const IMPACT_UPDATES: ImpactUpdate[] = [
-  {
-    id: '1',
+export function impactUpdateRecordToCard(u: ImpactUpdateRecord, campaignName: string): ImpactUpdate {
+  return {
+    id: u.id,
     initials: 'B',
     name: 'Beneficiary',
-    time: 'Yesterday',
-    message: '"The medical supplies arrived at the clinic. We\'ve already helped 14 families this week. Thank you so much."',
-    hasPhoto: true,
-    donationRef: 'Re: your $75.00 donation',
-  },
-  {
-    id: '2',
-    initials: 'B',
-    name: 'Beneficiary',
-    time: '1 week ago',
-    message: '"Books and stationery distributed to 32 students. School starts Monday!"',
-    donationRef: 'Re: your $50.00 donation',
-  },
-];
+    time: formatTimeAgo(u.created_at),
+    message: u.message,
+    mediaUrl: u.media_url ?? undefined,
+    mediaType: u.media_type ?? undefined,
+    donationRef: `Re: ${campaignName}`,
+  };
+}
 
 // ─── Shared components ────────────────────────────────────────────────────────
 
@@ -100,9 +104,12 @@ export function ImpactUpdateCard({ item }: { item: ImpactUpdate }) {
         <Text style={shared.impactTime}>{item.time}</Text>
       </View>
       <Text style={shared.impactMessage}>{item.message}</Text>
-      {item.hasPhoto && (
+      {item.mediaUrl && item.mediaType === 'image' && (
+        <Image source={{ uri: item.mediaUrl }} style={shared.impactPhoto} />
+      )}
+      {item.mediaUrl && item.mediaType === 'video' && (
         <View style={shared.photoTag}>
-          <Text style={shared.photoTagText}>📷 Photo update attached</Text>
+          <Text style={shared.photoTagText}>🎬 Video update attached</Text>
         </View>
       )}
       <View style={shared.donationRefBadge}>
@@ -220,6 +227,12 @@ export const shared = StyleSheet.create({
     color: Colors.text.secondary,
     lineHeight: 19,
     fontStyle: 'italic',
+  },
+  impactPhoto: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+    resizeMode: 'cover',
   },
   photoTag: {
     backgroundColor: Colors.bgCard,

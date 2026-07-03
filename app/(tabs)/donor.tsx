@@ -9,19 +9,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Colors } from '../../constants/colors';
-import { setAuthToken, fetchCampaigns } from '../../lib/api';
-import type { SessionDonation } from '../../lib/sessionDonations';
-import { shortenAddress } from '../../lib/format';
+import { fetchCampaigns, fetchDonations, fetchImpactUpdates } from '../../lib/api';
+import { formatUsdc, formatTimeAgo, shortenAddress } from '../../lib/format';
+import { getWalletAddress } from '../../lib/blockchain';
 import {
-  MY_DONATIONS,
-  IMPACT_UPDATES,
   Avatar,
   DonationRow,
   ImpactUpdateCard,
   CampaignRow,
-  type Donation,
-  type DonationStatus,
+  donationRecordToRow,
+  impactUpdateRecordToCard,
 } from '../../lib/donorShared';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -29,31 +28,54 @@ import {
 const TRACKER_STEPS = ['Initiated', 'On-chain', 'Arriving', 'Notified', 'Impact\nconfirmed'];
 
 export default function DonorDashboard() {
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  useEffect(() => { getWalletAddress().then(setWalletAddress); }, []);
+
   const { data: campaigns, isLoading: campaignsLoading, isError: campaignsError } = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => fetchCampaigns(),
   });
 
-  const { data: sessionDonations = [] } = useQuery<SessionDonation[]>({
-    queryKey: ['sessionDonations'],
-    queryFn: () => [],
-    staleTime: Infinity,
-    gcTime: Infinity,
+  // Separate, unfiltered list used only to resolve names for past
+  // donations/updates — a donation's campaign may have since been
+  // deactivated, but it should still show its real name, not "Unknown".
+  const { data: allCampaigns } = useQuery({
+    queryKey: ['campaigns', 'all'],
+    queryFn: () => fetchCampaigns(false),
   });
-  const sessionDonationRows: Donation[] = sessionDonations.map(d => ({
-    id: `session_${d.id}`,
-    initials: d.campaignName.slice(0, 2).toUpperCase(),
-    avatarColor: Colors.teal,
-    name: shortenAddress(d.recipientAddress),
-    campaign: d.campaignName,
-    amount: `$${d.amount}`,
-    time: 'Just now',
-    status: 'In transit' as DonationStatus,
-  }));
-  const allDonations = [...sessionDonationRows, ...MY_DONATIONS];
 
-  function handleSignOut() {
-    setAuthToken(null);
+  const { data: myDonationsData } = useQuery({
+    queryKey: ['donations', walletAddress],
+    queryFn: () => fetchDonations({ donor_address: walletAddress!, limit: 20 }),
+    enabled: !!walletAddress,
+  });
+  const latestDonation = myDonationsData?.items[0];
+  const latestDonationCampaign = allCampaigns?.find(
+    c => c.on_chain_id === latestDonation?.on_chain_campaign_id
+  );
+  const myDonationRows = (myDonationsData?.items ?? []).map(d => {
+    const campaignName = allCampaigns?.find(c => c.on_chain_id === d.on_chain_campaign_id)?.name
+      ?? 'Unknown campaign';
+    return donationRecordToRow(d, campaignName);
+  });
+
+  const totalDonatedWei = (myDonationsData?.items ?? [])
+    .reduce((sum, d) => sum + BigInt(d.amount_wei), 0n)
+    .toString();
+  const donationCount = myDonationsData?.total ?? 0;
+
+  const { data: impactUpdatesData } = useQuery({
+    queryKey: ['impact-updates', walletAddress],
+    queryFn: () => fetchImpactUpdates({ donor_address: walletAddress!, limit: 20 }),
+    enabled: !!walletAddress,
+  });
+  const impactUpdateCards = (impactUpdatesData?.items ?? []).map(u => {
+    const campaignName = allCampaigns?.find(c => c.id === u.campaign_id)?.name
+      ?? 'Unknown campaign';
+    return impactUpdateRecordToCard(u, campaignName);
+  });
+
+  function handleBack() {
     router.replace('/');
   }
 
@@ -63,24 +85,38 @@ export default function DonorDashboard() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Avatar initials="MR" color={Colors.teal} size={40} />
-          <Text style={styles.headerRole}>Donor · 38 donations · member since Jan 2026</Text>
+          <Avatar initials={walletAddress ? walletAddress.slice(2, 4).toUpperCase() : '—'} color={Colors.teal} size={40} />
+          <View>
+            <Text style={styles.headerRole}>Donor dashboard</Text>
+            {walletAddress ? (
+              <Text style={styles.walletAddress}>Wallet: {shortenAddress(walletAddress)}</Text>
+            ) : null}
+          </View>
         </View>
 
         {/* Stats row */}
         <View style={styles.statsRow}>
-          <StatCard label="Total donated" value="$3,240" sub="across 38 donations" />
-          <StatCard label="Campaigns" value="12" sub="in 6 countries" />
-          <StatCard label="Impact updates" value="9" sub="from beneficiaries" />
+          <StatCard
+            label="Total donated"
+            value={formatUsdc(totalDonatedWei)}
+            sub={`across ${donationCount} donation${donationCount === 1 ? '' : 's'}`}
+          />
+          <StatCard label="Impact updates" value={String(impactUpdatesData?.total ?? 0)} sub="from beneficiaries" />
         </View>
 
         {/* Latest donation tracker */}
         <SectionCard>
           <Text style={[styles.sectionTitle, { marginBottom: 6 }]}>Latest donation — path of the donation</Text>
-          <Text style={styles.trackerSub}>
-            $120.00 USDC → Clean Water, Malawi · today 14:22 UTC
-          </Text>
-          <TrackerBar currentStep={2} />
+          {latestDonation ? (
+            <>
+              <Text style={styles.trackerSub}>
+                {formatUsdc(latestDonation.amount_wei)} USDC → {latestDonationCampaign?.name ?? 'Unknown campaign'} · {formatTimeAgo(latestDonation.block_timestamp)}
+              </Text>
+              <TrackerBar currentStep={3} />
+            </>
+          ) : (
+            <Text style={styles.trackerSub}>No donations yet — make your first donation to see it tracked here.</Text>
+          )}
         </SectionCard>
 
         {/* My donations + Impact updates */}
@@ -94,7 +130,10 @@ export default function DonorDashboard() {
                 <Text style={styles.linkText}>See all</Text>
               </TouchableOpacity>
             </View>
-            {allDonations.slice(0, 2).map(d => (
+            {myDonationRows.length === 0 && (
+              <Text style={styles.emptyText}>No donations yet.</Text>
+            )}
+            {myDonationRows.slice(0, 2).map(d => (
               <DonationRow key={d.id} item={d} />
             ))}
           </SectionCard>
@@ -107,7 +146,10 @@ export default function DonorDashboard() {
                 <Text style={styles.linkText}>See all</Text>
               </TouchableOpacity>
             </View>
-            {IMPACT_UPDATES.slice(0, 2).map(u => (
+            {impactUpdateCards.length === 0 && (
+              <Text style={styles.emptyText}>No impact updates yet.</Text>
+            )}
+            {impactUpdateCards.slice(0, 2).map(u => (
               <ImpactUpdateCard key={u.id} item={u} />
             ))}
           </SectionCard>
@@ -133,9 +175,9 @@ export default function DonorDashboard() {
           ))}
         </SectionCard>
 
-        {/* Sign out */}
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Sign out</Text>
+        {/* Back */}
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -211,7 +253,11 @@ const styles = StyleSheet.create({
   headerRole: {
     fontSize: 12,
     color: Colors.text.secondary,
-    flex: 1,
+  },
+  walletAddress: {
+    fontSize: 11,
+    color: Colors.text.muted,
+    marginTop: 2,
   },
 
   // Stats row
@@ -352,9 +398,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 16,
   },
+  emptyText: {
+    fontSize: 12,
+    color: Colors.text.muted,
+    paddingVertical: 8,
+  },
 
-  // Sign out
-  signOutButton: {
+  // Back
+  backButton: {
     alignItems: 'center',
     padding: 14,
     borderRadius: 12,
@@ -362,7 +413,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     marginTop: 4,
   },
-  signOutText: {
+  backText: {
     fontSize: 14,
     fontWeight: '600',
     color: Colors.text.secondary,

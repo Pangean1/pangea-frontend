@@ -1,30 +1,34 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Colors } from '../../constants/colors';
-import { shortenAddress } from '../../lib/format';
-import type { SessionDonation } from '../../lib/sessionDonations';
-import { MY_DONATIONS, DonationRow, type Donation, type DonationStatus } from '../../lib/donorShared';
+import { fetchCampaigns, fetchDonations } from '../../lib/api';
+import { getWalletAddress } from '../../lib/blockchain';
+import { DonationRow, donationRecordToRow } from '../../lib/donorShared';
 
 export default function AllDonations() {
-  const { data: sessionDonations = [] } = useQuery<SessionDonation[]>({
-    queryKey: ['sessionDonations'],
-    queryFn: () => [],
-    staleTime: Infinity,
-    gcTime: Infinity,
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  useEffect(() => { getWalletAddress().then(setWalletAddress); }, []);
+
+  // Unfiltered — a donation's campaign may have since been deactivated, but
+  // should still resolve to its real name here, not "Unknown campaign".
+  const { data: campaigns } = useQuery({
+    queryKey: ['campaigns', 'all'],
+    queryFn: () => fetchCampaigns(false),
   });
-  const sessionRows: Donation[] = sessionDonations.map(d => ({
-    id: `session_${d.id}`,
-    initials: d.campaignName.slice(0, 2).toUpperCase(),
-    avatarColor: Colors.teal,
-    name: shortenAddress(d.recipientAddress),
-    campaign: d.campaignName,
-    amount: `$${d.amount}`,
-    time: 'Just now',
-    status: 'In transit' as DonationStatus,
-  }));
-  const allDonations = [...sessionRows, ...MY_DONATIONS];
+
+  const { data: donationsData, isLoading } = useQuery({
+    queryKey: ['donations', walletAddress],
+    queryFn: () => fetchDonations({ donor_address: walletAddress!, limit: 100 }),
+    enabled: !!walletAddress,
+  });
+  const allDonations = (donationsData?.items ?? []).map(d => {
+    const campaignName = campaigns?.find(c => c.on_chain_id === d.on_chain_campaign_id)?.name
+      ?? 'Unknown campaign';
+    return donationRecordToRow(d, campaignName);
+  });
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -36,6 +40,12 @@ export default function AllDonations() {
       </View>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.card}>
+          {isLoading && (
+            <ActivityIndicator color={Colors.teal} style={{ paddingVertical: 24 }} />
+          )}
+          {!isLoading && allDonations.length === 0 && (
+            <Text style={styles.emptyText}>No donations yet.</Text>
+          )}
           {allDonations.map(d => (
             <DonationRow key={d.id} item={d} />
           ))}
@@ -64,5 +74,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: Colors.text.muted,
+    textAlign: 'center',
+    paddingVertical: 16,
   },
 });
