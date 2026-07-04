@@ -20,7 +20,8 @@ PANGEA lets donors send USDC directly to verified humanitarian campaigns with ze
 4. [Environment Variables](#environment-variables)
 5. [Running the Dev Server](#running-the-dev-server)
 6. [Key Dependencies](#key-dependencies)
-7. [License](#license)
+7. [Roadmap](#roadmap)
+8. [License](#license)
 
 ---
 
@@ -162,6 +163,14 @@ Then scan the QR code with the Expo Go app on your phone.
 | `expo-auth-session` | ~7.0.11 | Google OAuth flow |
 | `expo-notifications` | ~0.32.17 | Firebase push notifications |
 | `babel-preset-expo` | ~54.0.10 | Babel config (pinned — required for Expo SDK 54) |
+
+---
+
+## Roadmap
+
+### Production Stage
+
+Changes intentionally deferred until PANGEA reaches its Production stage (post-mainnet, once real institutional/grant engagement exists) — including the "Donate with Card" fiat on-ramp and multi-chain support — are tracked in [`PRODUCTION_STAGE_CHANGES.md`](https://github.com/Pangean1/pangea-backend/blob/main/docs/PRODUCTION_STAGE_CHANGES.md) in the pangea-backend repo.
 
 ---
 
