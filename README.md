@@ -124,8 +124,11 @@ nano .env
 | Variable | Description |
 |---|---|
 | `EXPO_PUBLIC_API_URL` | Base URL of the pangea-backend API (e.g. `http://199.244.49.208:8000`) |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google OAuth Web Client ID (from Google Cloud Console) |
-| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | Google OAuth Android Client ID |
+| `EXPO_PUBLIC_AMOY_RPC_URL` | Polygon Amoy RPC endpoint (e.g. Alchemy) |
+| `EXPO_PUBLIC_BUNDLER_URL` | ZeroDev bundler endpoint (ERC-4337 UserOperations) |
+| `EXPO_PUBLIC_PAYMASTER_URL` | ZeroDev paymaster endpoint (sponsors gas) |
+| `EXPO_PUBLIC_CONTRACT_ADDRESS` | Deployed `PangeaDonation` contract address |
+| `EXPO_PUBLIC_USDC_ADDRESS` | USDC token contract address on Polygon Amoy |
 
 > `.env` is gitignored and never committed. Never put private keys or secrets in environment variables prefixed with `EXPO_PUBLIC_` — they are bundled into the app binary and visible to anyone who inspects it.
 
@@ -160,7 +163,8 @@ Then scan the QR code with the Expo Go app on your phone.
 | `@zerodev/ecdsa-validator` | ^5.4.9 | ECDSA key validator for smart accounts |
 | `wagmi` | ^3.6.0 | React hooks for Ethereum |
 | `viem` | ^2.47.6 | Low-level Ethereum client |
-| `expo-auth-session` | ~7.0.11 | Google OAuth flow |
+| `expo-crypto` | ~15.0.9 | Generates the per-account embedded wallet key |
+| `expo-secure-store` | ^56.0.4 | Stores the JWT and wallet private key on-device |
 | `expo-notifications` | ~0.32.17 | Firebase push notifications |
 | `babel-preset-expo` | ~54.0.10 | Babel config (pinned — required for Expo SDK 54) |
 
