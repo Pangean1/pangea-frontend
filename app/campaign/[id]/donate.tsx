@@ -63,7 +63,7 @@ export default function DonateScreen() {
       const hash = await executeDonation(
         campaign.on_chain_id,
         numericAmount,
-        '',
+        `Campaign: ${campaign.name}`,
         setTxStatus,
       );
       setTxHash(hash);
