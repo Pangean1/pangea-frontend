@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../constants/colors';
-import { fetchCampaigns, fetchDonations, fetchUser, postImpactUpdate, type DonationRecord, type Campaign } from '../lib/api';
+import { fetchCampaigns, fetchDonations, fetchUser, fetchImpactUpdates, postImpactUpdate, type DonationRecord, type Campaign } from '../lib/api';
 import { formatUsdc, usdcPercent, shortenAddress, formatTimeAgo, formatMonthYear } from '../lib/format';
 import { getWalletAddress } from '../lib/blockchain';
 
@@ -91,6 +91,12 @@ export default function RecipientDashboard() {
     .reduce((sum, d) => sum + BigInt(d.amount_wei), 0n)
     .toString();
   const totalReceivedCount = incomingDonationsData?.total ?? 0;
+
+  const { data: myImpactUpdatesData } = useQuery({
+    queryKey: ['impact-updates', 'recipient', walletAddress],
+    queryFn: () => fetchImpactUpdates({ recipient_address: walletAddress! }),
+    enabled: !!walletAddress,
+  });
 
   function handleBack() {
     router.replace('/');
@@ -165,7 +171,7 @@ export default function RecipientDashboard() {
         <View style={styles.statsRow}>
           <StatCard label="Total received" value={formatUsdc(totalReceivedWei)} sub={`across ${totalReceivedCount} donations`} teal />
           <StatCard label="Campaigns" value={String(myCampaigns.length)} sub="on Amoy testnet" />
-          <StatCard label="Updates" value="0" sub="impact updates" />
+          <StatCard label="Updates" value={String(myImpactUpdatesData?.total ?? 0)} sub="impact updates" />
         </View>
 
         {/* My campaigns */}

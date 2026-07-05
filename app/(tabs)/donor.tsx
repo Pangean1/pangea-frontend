@@ -78,6 +78,12 @@ export default function DonorDashboard() {
     return impactUpdateRecordToCard(u, campaignName);
   });
 
+  // Stage 5 ("Impact confirmed") only checks once the beneficiary has
+  // actually posted an update for the latest donation's campaign.
+  const latestDonationConfirmed = (impactUpdatesData?.items ?? []).some(
+    u => u.campaign_id === latestDonation?.campaign_id
+  );
+
   function handleBack() {
     router.replace('/');
   }
@@ -115,7 +121,7 @@ export default function DonorDashboard() {
               <Text style={styles.trackerSub}>
                 {formatUsdc(latestDonation.amount_wei)} USDC → {latestDonationCampaign?.name ?? 'Unknown campaign'} · {formatTimeAgo(latestDonation.block_timestamp)}
               </Text>
-              <TrackerBar currentStep={3} />
+              <TrackerBar currentStep={latestDonationConfirmed ? 5 : 3} />
             </>
           ) : (
             <Text style={styles.trackerSub}>No donations yet — make your first donation to see it tracked here.</Text>

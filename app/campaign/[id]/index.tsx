@@ -13,11 +13,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../../constants/colors';
 import { fetchCampaign } from '../../../lib/api';
 import { formatUsdc, usdcPercent, shortenAddress } from '../../../lib/format';
-import { getCampaignMedia } from '../../../lib/campaignMedia';
 
 export default function CampaignDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const campaignMedia = getCampaignMedia(id ?? '');
 
   const { data: campaign, isLoading, isError } = useQuery({
     queryKey: ['campaign', id],
@@ -72,10 +70,10 @@ export default function CampaignDetail() {
           </View>
 
           {/* Beneficiary media */}
-          {campaignMedia && (
+          {campaign.media_url && (
             <View style={styles.mediaCard}>
-              {campaignMedia.type === 'image' ? (
-                <Image source={{ uri: campaignMedia.uri }} style={styles.mediaImage} />
+              {campaign.media_type === 'image' ? (
+                <Image source={{ uri: campaign.media_url }} style={styles.mediaImage} />
               ) : (
                 <View style={styles.videoBox}>
                   <Text style={styles.videoIcon}>🎬</Text>

@@ -30,6 +30,8 @@ export interface Campaign {
   active: boolean;
   total_raised_wei: string;
   goal_wei: string;
+  media_url: string | null;
+  media_type: 'image' | 'video' | null;
   created_at: string;
   updated_at: string;
 }
@@ -50,8 +52,45 @@ export async function createCampaign(payload: {
   name: string;
   description: string;
   goal_usd: string;
+  media?: { uri: string; type: 'image' | 'video' };
 }): Promise<Campaign> {
-  const { data } = await api.post('/campaigns', payload);
+  const form = new FormData();
+  form.append('name', payload.name);
+  form.append('description', payload.description);
+  form.append('goal_usd', payload.goal_usd);
+  if (payload.media) {
+    const filename = payload.media.uri.split('/').pop() ?? 'upload';
+    form.append('media', {
+      uri: payload.media.uri,
+      name: filename,
+      type: payload.media.type === 'video' ? 'video/mp4' : 'image/jpeg',
+    } as unknown as Blob);
+  }
+  const { data } = await api.post<Campaign>('/campaigns', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function setCampaignMediaApi(
+  campaignId: string,
+  media: { uri: string; type: 'image' | 'video' }
+): Promise<Campaign> {
+  const form = new FormData();
+  const filename = media.uri.split('/').pop() ?? 'upload';
+  form.append('media', {
+    uri: media.uri,
+    name: filename,
+    type: media.type === 'video' ? 'video/mp4' : 'image/jpeg',
+  } as unknown as Blob);
+  const { data } = await api.put<Campaign>(`/campaigns/${campaignId}/media`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+export async function removeCampaignMediaApi(campaignId: string): Promise<Campaign> {
+  const { data } = await api.delete<Campaign>(`/campaigns/${campaignId}/media`);
   return data;
 }
 
@@ -146,6 +185,7 @@ export interface ImpactUpdateRecord {
 
 export async function fetchImpactUpdates(params: {
   donor_address?: string;
+  recipient_address?: string;
   limit?: number;
   offset?: number;
 } = {}): Promise<{ items: ImpactUpdateRecord[]; total: number }> {

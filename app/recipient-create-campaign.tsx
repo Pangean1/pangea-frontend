@@ -11,26 +11,34 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../constants/colors';
-import { fetchCampaigns, createCampaign, type Campaign } from '../lib/api';
+import {
+  fetchCampaigns,
+  createCampaign,
+  setCampaignMediaApi,
+  removeCampaignMediaApi,
+  type Campaign,
+} from '../lib/api';
 import { formatUsdc, usdcPercent } from '../lib/format';
 import { queryClient } from '../lib/queryClient';
 import { removeLocalCampaign } from '../lib/localCampaigns';
-import {
-  setCampaignMedia,
-  removeCampaignMedia,
-  type CampaignMediaEntry,
-} from '../lib/campaignMedia';
+import { getWalletAddress } from '../lib/blockchain';
 
 export default function CreateCampaign() {
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  useFocusEffect(useCallback(() => { getWalletAddress().then(setWalletAddress); }, []));
+
   const { data: campaigns, isLoading, isError } = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => fetchCampaigns(),
   });
+  const myCampaigns: Campaign[] = walletAddress
+    ? (campaigns ?? []).filter(c => c.recipient_address.toLowerCase() === walletAddress.toLowerCase())
+    : [];
 
   // ── New campaign form ─────────────────────────────────────────────────────
   const [name, setName] = useState('');
@@ -44,7 +52,7 @@ export default function CreateCampaign() {
 
   // ── Existing campaign management ──────────────────────────────────────────
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
-  const [campaignMediaMap, setCampaignMediaMap] = useState<Record<string, CampaignMediaEntry>>({});
+  const [mediaUpdatingId, setMediaUpdatingId] = useState<string | null>(null);
 
   const canCreate =
     name.trim().length > 0 &&
@@ -74,6 +82,7 @@ export default function CreateCampaign() {
         name: name.trim(),
         description: description.trim(),
         goal_usd: String(parseFloat(goal)),
+        media: formMediaUri && formMediaType ? { uri: formMediaUri, type: formMediaType } : undefined,
       });
       setName('');
       setDescription('');
@@ -103,25 +112,30 @@ export default function CreateCampaign() {
     });
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
-      const entry: CampaignMediaEntry = {
-        uri: asset.uri,
-        type: asset.type === 'video' ? 'video' : 'image',
-      };
-      setCampaignMedia(campaignId, entry);
-      setCampaignMediaMap(prev => ({ ...prev, [campaignId]: entry }));
+      setMediaUpdatingId(campaignId);
+      try {
+        await setCampaignMediaApi(campaignId, {
+          uri: asset.uri,
+          type: asset.type === 'video' ? 'video' : 'image',
+        });
+        queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      } finally {
+        setMediaUpdatingId(null);
+      }
     }
   }
 
-  function handleRemoveCampaignMedia(campaignId: string) {
-    removeCampaignMedia(campaignId);
-    setCampaignMediaMap(prev => {
-      const next = { ...prev };
-      delete next[campaignId];
-      return next;
-    });
+  async function handleRemoveCampaignMedia(campaignId: string) {
+    setMediaUpdatingId(campaignId);
+    try {
+      await removeCampaignMediaApi(campaignId);
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+    } finally {
+      setMediaUpdatingId(null);
+    }
   }
 
-  const visibleCampaigns = (campaigns ?? []).filter(c => !deletedIds.has(c.id));
+  const visibleCampaigns = myCampaigns.filter(c => !deletedIds.has(c.id));
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -236,7 +250,7 @@ export default function CreateCampaign() {
               {submitting
                 ? <ActivityIndicator color={Colors.text.inverse} />
                 : <Text style={[styles.createButtonText, !canCreate && styles.createButtonTextDisabled]}>
-                    Submit request
+                    Submit Campaign
                   </Text>
               }
             </TouchableOpacity>
@@ -259,7 +273,7 @@ export default function CreateCampaign() {
               const barColor = percent >= 75 ? Colors.warning : Colors.teal;
               const hasNoDonations = c.total_raised_wei === '0' || c.total_raised_wei === '0x0';
               const isFirst = index === 0;
-              const media = campaignMediaMap[c.id];
+              const isUpdatingMedia = mediaUpdatingId === c.id;
 
               return (
                 <View key={c.id} style={[styles.campaignRow, !isFirst && styles.campaignRowBorder]}>
@@ -283,10 +297,14 @@ export default function CreateCampaign() {
                   <Text style={styles.campaignMeta}>{raised} of {goalFmt} · {percent}% funded</Text>
 
                   {/* Per-campaign media (for existing campaigns) */}
-                  {media ? (
+                  {isUpdatingMedia ? (
+                    <View style={styles.mediaPickerButton}>
+                      <ActivityIndicator color={Colors.teal} />
+                    </View>
+                  ) : c.media_url ? (
                     <View style={styles.mediaPreview}>
-                      {media.type === 'image' ? (
-                        <Image source={{ uri: media.uri }} style={styles.mediaThumb} />
+                      {c.media_type === 'image' ? (
+                        <Image source={{ uri: c.media_url }} style={styles.mediaThumb} />
                       ) : (
                         <View style={styles.videoPreview}>
                           <Text style={styles.videoIcon}>🎬</Text>

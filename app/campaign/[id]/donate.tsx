@@ -18,7 +18,6 @@ import { useState } from 'react';
 import { Colors } from '../../../constants/colors';
 import { fetchCampaign } from '../../../lib/api';
 import { shortenAddress } from '../../../lib/format';
-import { getCampaignMedia } from '../../../lib/campaignMedia';
 import { executeDonation, getExplorerUrl, type DonationStatus } from '../../../lib/blockchain';
 
 type Step = 'enter' | 'confirm' | 'success';
@@ -52,7 +51,6 @@ export default function DonateScreen() {
 
   const numericAmount = parseFloat(amount);
   const isValidAmount = !isNaN(numericAmount) && numericAmount >= 1;
-  const campaignMedia = getCampaignMedia(id ?? '');
 
   const handleConfirm = async () => {
     if (!campaign) return;
@@ -180,10 +178,10 @@ export default function DonateScreen() {
           <Text style={styles.pageTitle}>Donate to</Text>
           <Text style={styles.campaignName}>{campaign?.name ?? '…'}</Text>
 
-          {campaignMedia && (
+          {campaign?.media_url && (
             <View style={styles.mediaCard}>
-              {campaignMedia.type === 'image' ? (
-                <Image source={{ uri: campaignMedia.uri }} style={styles.mediaImage} />
+              {campaign.media_type === 'image' ? (
+                <Image source={{ uri: campaign.media_url }} style={styles.mediaImage} />
               ) : (
                 <View style={styles.videoPreview}>
                   <Text style={styles.videoIcon}>🎬</Text>
