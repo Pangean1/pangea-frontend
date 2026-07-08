@@ -11,6 +11,7 @@ import {
   Platform,
   Image,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -21,6 +22,13 @@ import { Colors } from '../constants/colors';
 import { fetchCampaigns, fetchDonations, fetchUser, fetchImpactUpdates, postImpactUpdate, type DonationRecord, type Campaign } from '../lib/api';
 import { formatUsdc, usdcPercent, shortenAddress, formatTimeAgo, formatMonthYear } from '../lib/format';
 import { getWalletAddress } from '../lib/blockchain';
+
+// Explorer base URL and contract address come from env config so these links point
+// at the right network (Amoy testnet today, Polygon mainnet later) without code changes.
+const EXPLORER_BASE_URL = process.env.EXPO_PUBLIC_EXPLORER_BASE_URL!;
+const CONTRACT_ADDRESS = process.env.EXPO_PUBLIC_CONTRACT_ADDRESS!;
+const CONTRACT_EVENTS_URL = `${EXPLORER_BASE_URL}/address/${CONTRACT_ADDRESS}#events`;
+const CONTRACT_READ_URL = `${EXPLORER_BASE_URL}/address/${CONTRACT_ADDRESS}#readContract`;
 
 // ─── Real data mapping ─────────────────────────────────────────────────────────
 
@@ -263,6 +271,19 @@ export default function RecipientDashboard() {
           </Text>
         </View>
 
+        {/* On-chain data links */}
+        <View style={styles.onchainLinks}>
+          <TouchableOpacity onPress={() => Linking.openURL(CONTRACT_EVENTS_URL)} activeOpacity={0.7}>
+            <Text style={styles.onchainLinkText}>Campaigns general data ↗</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL(CONTRACT_READ_URL)} activeOpacity={0.7}>
+            <Text style={styles.onchainLinkText}>Campaign detailed data ↗</Text>
+          </TouchableOpacity>
+          <Text style={styles.onchainLinkHint}>
+            For detailed data: open the link, tap "campaigns", enter a campaign's id (e.g. 7), then tap "Query".
+          </Text>
+        </View>
+
         {/* Back */}
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Text style={styles.backText}>Back</Text>
@@ -470,6 +491,10 @@ const styles = StyleSheet.create({
 
   backButton: { alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, marginTop: 4 },
   backText: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary },
+
+  onchainLinks: { paddingHorizontal: 4, gap: 4 },
+  onchainLinkText: { fontSize: 12, fontWeight: '600', color: Colors.teal },
+  onchainLinkHint: { fontSize: 11, color: Colors.text.muted, marginTop: 2 },
 
   errorText: { fontSize: 13, color: Colors.error, paddingVertical: 12 },
   emptyText: { fontSize: 13, color: Colors.text.muted, paddingVertical: 12, textAlign: 'center' },

@@ -13,6 +13,7 @@ import { fundWalletIfNeeded, waitForDonationIndexed } from './api';
 const RPC_URL = process.env.EXPO_PUBLIC_AMOY_RPC_URL!;
 const CONTRACT_ADDRESS = process.env.EXPO_PUBLIC_CONTRACT_ADDRESS as Address;
 const USDC_ADDRESS = process.env.EXPO_PUBLIC_USDC_ADDRESS as Address;
+const EXPLORER_BASE_URL = process.env.EXPO_PUBLIC_EXPLORER_BASE_URL!;
 
 const ERC20_ABI = [
   {
@@ -143,7 +144,7 @@ export async function executeDonation(
 }
 
 export function getExplorerUrl(txHash: string): string {
-  return `https://amoy.polygonscan.com/tx/${txHash}`;
+  return `${EXPLORER_BASE_URL}/tx/${txHash}`;
 }
 
 export async function getWalletAddress(): Promise<string | null> {

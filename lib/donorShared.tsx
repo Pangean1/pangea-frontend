@@ -131,7 +131,9 @@ export function CampaignRow({ item }: { item: Campaign }) {
       onPress={() => router.push(`/campaign/${item.id}`)}
       activeOpacity={0.7}
     >
-      <Text style={shared.campaignTitle}>{item.name}</Text>
+      <Text style={shared.campaignTitle}>
+        {item.name} <Text style={shared.campaignId}>#{item.on_chain_id}</Text>
+      </Text>
       <Text style={shared.campaignBy}>{shortenAddress(item.recipient_address)}</Text>
       <View style={shared.progressBar}>
         <View style={[shared.progressFill, { width: `${percent}%` as any, backgroundColor: barColor }]} />
@@ -270,6 +272,11 @@ export const shared = StyleSheet.create({
     fontWeight: '700',
     color: Colors.text.primary,
     flex: 1,
+  },
+  campaignId: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.text.muted,
   },
   campaignBy: {
     fontSize: 11,
