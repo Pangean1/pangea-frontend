@@ -156,7 +156,6 @@ export default function RecipientDashboard() {
 
   const visibleCampaigns = myCampaigns.slice(0, 2);
   const visibleDonations = incomingDonations.slice(0, 2);
-  const hasMoreCampaigns = myCampaigns.length > 2;
   const hasMoreDonations = incomingDonations.length > 2;
 
   return (
@@ -186,7 +185,7 @@ export default function RecipientDashboard() {
         <SectionCard>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>My campaigns</Text>
-            {hasMoreCampaigns && (
+            {visibleCampaigns.length > 0 && (
               <TouchableOpacity onPress={() => router.push('/recipient-all-campaigns')} activeOpacity={0.7}>
                 <Text style={styles.seeAllLink}>See all</Text>
               </TouchableOpacity>

@@ -154,9 +154,18 @@ export default function DonateScreen() {
               <ActivityIndicator size="small" color={Colors.text.inverse} />
             ) : (
               <Text style={styles.confirmButtonText}>
-                Confirm — send ${numericAmount.toFixed(2)} USDC
+                Donate with Wallet
               </Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cardButton}
+            disabled
+          >
+            <Text style={styles.cardButtonText}>
+              Donate with Card (disable)
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -523,6 +532,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: Colors.text.inverse,
+  },
+  cardButton: {
+    backgroundColor: Colors.border,
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    minHeight: 56,
+    opacity: 0.6,
+  },
+  cardButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text.secondary,
   },
   successContainer: {
     flexGrow: 1,
