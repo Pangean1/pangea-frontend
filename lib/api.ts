@@ -175,7 +175,6 @@ export interface UserRecord {
   id: string;
   wallet_address: string;
   fcm_token: string | null;
-  username: string | null;
   email: string | null;
   created_at: string;
   updated_at: string;
