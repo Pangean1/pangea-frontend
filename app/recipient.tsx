@@ -13,6 +13,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -154,6 +155,12 @@ export default function RecipientDashboard() {
     }
   }
 
+  async function handleCopyAddress() {
+    if (!walletAddress) return;
+    await Clipboard.setStringAsync(walletAddress);
+    Alert.alert('Address copied', walletAddress);
+  }
+
   const visibleCampaigns = myCampaigns.slice(0, 2);
   const visibleDonations = incomingDonations.slice(0, 2);
   const hasMoreDonations = incomingDonations.length > 2;
@@ -167,10 +174,13 @@ export default function RecipientDashboard() {
           <Avatar initials={walletAddress ? walletAddress.slice(2, 4).toUpperCase() : '—'} color={Colors.warning} size={40} />
           <View>
             <Text style={styles.headerName}>Beneficiary</Text>
-            <Text style={styles.headerRole}>
-              {walletAddress ? shortenAddress(walletAddress) : '—'}
-              {user ? ` · member since ${formatMonthYear(user.created_at)}` : ''}
-            </Text>
+            <TouchableOpacity onPress={handleCopyAddress} disabled={!walletAddress}>
+              <Text style={styles.headerRole}>
+                {walletAddress ? shortenAddress(walletAddress) : '—'}
+                {user ? ` · member since ${formatMonthYear(user.created_at)}` : ''}
+                {walletAddress ? '  ⧉' : ''}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
