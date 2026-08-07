@@ -47,6 +47,9 @@ export default function AllDonations() {
           {incomingDonations.map(d => (
             <DonationRow key={d.id} item={d} />
           ))}
+          <TouchableOpacity style={styles.cashOutButton} disabled>
+            <Text style={styles.cashOutButtonText}>Cash Out (disable)</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -79,4 +82,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 16,
   },
+  cashOutButton: {
+    backgroundColor: Colors.border,
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    minHeight: 56,
+    opacity: 0.6,
+  },
+  cashOutButtonText: { fontSize: 16, fontWeight: '800', color: Colors.text.secondary },
 });
