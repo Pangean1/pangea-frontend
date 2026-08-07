@@ -5,7 +5,9 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -88,6 +90,12 @@ export default function DonorDashboard() {
     router.replace('/');
   }
 
+  async function handleCopyAddress() {
+    if (!walletAddress) return;
+    await Clipboard.setStringAsync(walletAddress);
+    Alert.alert('Address copied', walletAddress);
+  }
+
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -98,7 +106,9 @@ export default function DonorDashboard() {
           <View>
             <Text style={styles.headerRole}>Donor dashboard</Text>
             {walletAddress ? (
-              <Text style={styles.walletAddress}>Wallet: {shortenAddress(walletAddress)}</Text>
+              <TouchableOpacity onPress={handleCopyAddress}>
+                <Text style={styles.walletAddress}>Wallet: {shortenAddress(walletAddress)}  ⧉</Text>
+              </TouchableOpacity>
             ) : null}
           </View>
         </View>
