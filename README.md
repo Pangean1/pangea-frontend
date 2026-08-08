@@ -2,9 +2,9 @@
 
 > 📄 For the full project vision and technical specification, see the [PANGEA White Paper](https://github.com/Pangean1/pangea-backend/blob/main/docs/WHITEPAPER.md)
 
-> Non-profit peer-to-peer humanitarian donation platform on **Polygon PoS** (Amoy testnet).
+> Non-profit peer-to-peer humanitarian donation platform on **Polygon PoS**.
 
-PANGEA lets donors send USDC directly to verified humanitarian campaigns with zero platform fees. This repository is the React Native / Expo mobile app — the donor and recipient interface. Blockchain complexity is invisible to the user: no seed phrases, no gas management, no crypto knowledge required.
+PANGEA lets donors send USDC directly to verified humanitarian campaigns with zero platform fees. This repository is the React Native mobile app — the donor and recipient interface. Blockchain complexity is invisible to the user: no seed phrases, no gas management, no crypto knowledge required.
 
 - Smart contracts: [pangea-contracts](https://github.com/Pangean1/pangea-contracts)
 - Backend API: [pangea-backend](https://github.com/Pangean1/pangea-backend)
@@ -100,7 +100,7 @@ PANGEA lets donors send USDC directly to verified humanitarian campaigns with ze
 |------|---------|
 | Node.js | 20+ |
 | Expo Go | Latest (installed on Android or iOS device) |
-| pangea-backend | Running at `http://<server-ip>:8000` |
+| pangea-backend | Running at `http://<server-ip>:<port>` |
 
 ### Installation
 
@@ -123,7 +123,7 @@ nano .env
 
 | Variable | Description |
 |---|---|
-| `EXPO_PUBLIC_API_URL` | Base URL of the pangea-backend API (e.g. `http://199.244.49.208:8000`) |
+| `EXPO_PUBLIC_API_URL` | Base URL of the pangea-backend API (e.g. `http://<server-ip>:<port>`) |
 | `EXPO_PUBLIC_AMOY_RPC_URL` | Polygon Amoy RPC endpoint (e.g. Alchemy) |
 | `EXPO_PUBLIC_BUNDLER_URL` | ZeroDev bundler endpoint (ERC-4337 UserOperations) |
 | `EXPO_PUBLIC_PAYMASTER_URL` | ZeroDev paymaster endpoint (sponsors gas) |
