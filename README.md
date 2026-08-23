@@ -2,9 +2,9 @@
 
 > 📄 For the full project vision and technical specification, see the [PANGEA White Paper](https://github.com/Pangean1/pangea-backend/blob/main/docs/WHITEPAPER.md)
 
-> Non-profit peer-to-peer humanitarian donation platform on **Polygon PoS**.
+> PANGEA: non-profit peer-to-peer on-chain humanitarian donation platform.
 
-PANGEA lets donors send USDC directly to verified humanitarian campaigns with zero platform fees. This repository is the React Native mobile app — the donor and recipient interface. Blockchain complexity is invisible to the user: no seed phrases, no gas management, no crypto knowledge required.
+PANGEA lets donors send donations directly to verified humanitarian campaigns with zero platform fees, full on-chain transparency, and immutable audit trails. This repository is the React Native mobile app. The donor and recipient interface. Blockchain complexity is invisible to the user: no seed phrases, no gas management, no crypto knowledge required.
 
 - Smart contracts: [pangea-contracts](https://github.com/Pangean1/pangea-contracts)
 - Backend API: [pangea-backend](https://github.com/Pangean1/pangea-backend)
