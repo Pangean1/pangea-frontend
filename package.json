@@ -15,7 +15,7 @@
     "@zerodev/sdk": "^5.5.8",
     "axios": "^1.14.0",
     "events": "^3.3.0",
-    "expo": "~54.0.35",
+    "expo": "~54.0.37",
     "expo-build-properties": "~1.0.10",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
