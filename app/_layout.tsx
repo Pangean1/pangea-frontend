@@ -24,6 +24,7 @@ export default function RootLayout() {
           <Stack.Screen name="recipient-all-donations" />
           <Stack.Screen name="recipient-create-campaign" />
           <Stack.Screen name="campaign/[id]" />
+          <Stack.Screen name="wallet-recovery" />
         </Stack>
       </QueryClientProvider>
     </AuthProvider>

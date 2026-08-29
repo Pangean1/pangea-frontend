@@ -119,6 +119,23 @@ export async function getOrCreateWallet(email: string): Promise<{ privateKey: st
   return { privateKey, address };
 }
 
+const PRIVATE_KEY_RE = /^0x[0-9a-fA-F]{64}$/;
+
+// One-time device recovery: overwrites this device's locally-stored key for
+// `email` with `privateKey` (e.g. one copied from another device/app where
+// the correct key for this account still lives). Used when a device never
+// had this account's key locally and silently generated a fresh, wrong one
+// instead — see the wallet-recovery screen.
+export async function restoreWalletKey(email: string, privateKey: string): Promise<string> {
+  const trimmed = privateKey.trim();
+  if (!PRIVATE_KEY_RE.test(trimmed)) {
+    throw new Error('Not a valid private key — expected 0x followed by 64 hex characters.');
+  }
+  const { address } = await getSmartAccountClient(trimmed);
+  await SecureStore.setItemAsync(walletKeyFor(email), trimmed);
+  return address;
+}
+
 export async function getWalletPrivateKey(): Promise<string | null> {
   const token = await SecureStore.getItemAsync(JWT_KEY);
   if (!token) return null;

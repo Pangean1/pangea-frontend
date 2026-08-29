@@ -293,6 +293,11 @@ export default function RecipientDashboard() {
           </Text>
         </View>
 
+        {/* Wallet recovery (advanced) */}
+        <TouchableOpacity onPress={() => router.push('/wallet-recovery')} style={styles.walletRecoveryLink}>
+          <Text style={styles.walletRecoveryLinkText}>Wallet recovery (advanced)</Text>
+        </TouchableOpacity>
+
         {/* Back */}
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Text style={styles.backText}>Back</Text>
@@ -500,6 +505,8 @@ const styles = StyleSheet.create({
 
   backButton: { alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, marginTop: 4 },
   backText: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary },
+  walletRecoveryLink: { alignItems: 'center', paddingVertical: 10 },
+  walletRecoveryLinkText: { fontSize: 12, color: Colors.text.muted, textDecorationLine: 'underline' },
 
   onchainLinks: { paddingHorizontal: 4, gap: 4 },
   onchainLinkText: { fontSize: 12, fontWeight: '600', color: Colors.teal },

@@ -194,6 +194,11 @@ export default function DonorDashboard() {
           ))}
         </SectionCard>
 
+        {/* Wallet recovery (advanced) */}
+        <TouchableOpacity onPress={() => router.push('/wallet-recovery')} style={styles.walletRecoveryLink}>
+          <Text style={styles.walletRecoveryLinkText}>Wallet recovery (advanced)</Text>
+        </TouchableOpacity>
+
         {/* Back */}
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Text style={styles.backText}>Back</Text>
@@ -422,6 +427,10 @@ const styles = StyleSheet.create({
     color: Colors.text.muted,
     paddingVertical: 8,
   },
+
+  // Wallet recovery
+  walletRecoveryLink: { alignItems: 'center', paddingVertical: 10 },
+  walletRecoveryLinkText: { fontSize: 12, color: Colors.text.muted, textDecorationLine: 'underline' },
 
   // Back
   backButton: {
