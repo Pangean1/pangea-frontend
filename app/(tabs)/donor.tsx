@@ -194,10 +194,18 @@ export default function DonorDashboard() {
           ))}
         </SectionCard>
 
-        {/* Wallet recovery (advanced) */}
-        <TouchableOpacity onPress={() => router.push('/wallet-recovery')} style={styles.walletRecoveryLink}>
-          <Text style={styles.walletRecoveryLinkText}>Wallet recovery (advanced)</Text>
-        </TouchableOpacity>
+        {/* Account */}
+        <SectionCard>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Account</Text>
+          </View>
+          <TouchableOpacity onPress={() => router.push('/wallet-recovery')} style={styles.walletRecoveryLink}>
+            <Text style={styles.walletRecoveryLinkText}>Wallet recovery (advanced)</Text>
+          </TouchableOpacity>
+          <Text style={styles.walletRecoveryHint}>
+            Use this only if you're signing into this same email on a different phone.
+          </Text>
+        </SectionCard>
 
         {/* Back */}
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
@@ -431,6 +439,7 @@ const styles = StyleSheet.create({
   // Wallet recovery
   walletRecoveryLink: { alignItems: 'center', paddingVertical: 10 },
   walletRecoveryLinkText: { fontSize: 12, color: Colors.text.muted, textDecorationLine: 'underline' },
+  walletRecoveryHint: { fontSize: 11, color: Colors.text.muted, textAlign: 'center', paddingHorizontal: 8, paddingBottom: 4 },
 
   // Back
   backButton: {
