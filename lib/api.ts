@@ -72,6 +72,7 @@ export async function createCampaign(payload: {
   }
   const { data } = await api.post<Campaign>('/campaigns', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 95000,
   });
   return data;
 }
@@ -107,7 +108,7 @@ export async function updateCampaignApi(
 }
 
 export async function setCampaignStatusApi(campaignId: string, active: boolean): Promise<Campaign> {
-  const { data } = await api.patch<Campaign>(`/campaigns/${campaignId}/status`, { active });
+  const { data } = await api.patch<Campaign>(`/campaigns/${campaignId}/status`, { active }, { timeout: 95000 });
   return data;
 }
 
