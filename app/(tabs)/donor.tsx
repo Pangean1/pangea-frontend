@@ -194,11 +194,13 @@ export default function DonorDashboard() {
           ))}
         </SectionCard>
 
-        {/* Account */}
+        {/* Back */}
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+
+        {/* Wallet recovery */}
         <SectionCard>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Account</Text>
-          </View>
           <TouchableOpacity onPress={() => router.push('/wallet-recovery')} style={styles.walletRecoveryLink}>
             <Text style={styles.walletRecoveryLinkText}>Wallet recovery (advanced)</Text>
           </TouchableOpacity>
@@ -206,11 +208,6 @@ export default function DonorDashboard() {
             Use this only if you're signing into this same email on a different phone.
           </Text>
         </SectionCard>
-
-        {/* Back */}
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
 
       </ScrollView>
     </SafeAreaView>
