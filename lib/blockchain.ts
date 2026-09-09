@@ -98,6 +98,22 @@ export async function executeDonation(
     // Testnet-only: silently top up the wallet with mock USDC so new donor
     // accounts can donate without a manual mint. No-op in production.
     await fundWalletIfNeeded();
+
+    // The faucet only tops up wallets under its own low threshold, so it may
+    // decline (e.g. a wallet already sitting at 2 USDC trying to donate 4).
+    // Re-check rather than assume it worked: an on-chain revert from here
+    // comes back as an opaque, unreadable bundler/UserOperation error (a raw
+    // custom-error selector, not a plain revert string), so catch this case
+    // ourselves with a clear message before ever submitting the transaction.
+    const balanceAfterFund = await publicClient.readContract({
+      address: USDC_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [smartAccountAddress as Address],
+    });
+    if (balanceAfterFund < amountWei) {
+      throw new Error('Insufficient USDC balance in your wallet.');
+    }
   }
 
   const allowance = await publicClient.readContract({
