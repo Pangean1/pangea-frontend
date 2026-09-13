@@ -15,8 +15,11 @@ import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { sendCode, verifyCode, getOrCreateWallet } from '../lib/auth';
+import { fetchCampaigns, type Campaign } from '../lib/api';
+import { formatUsdc, usdcPercent } from '../lib/format';
 import { Colors } from '../constants/colors';
 
 type AuthStep = 'email' | 'code';
@@ -29,6 +32,11 @@ export default function LoginScreen() {
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const { data: activeCampaigns } = useQuery({
+    queryKey: ['campaigns', 'entry-screen-preview'],
+    queryFn: () => fetchCampaigns(true),
+  });
 
   const handleSendCode = async () => {
     const trimmed = email.trim().toLowerCase();
@@ -187,6 +195,13 @@ export default function LoginScreen() {
             <Text style={styles.versionText}>v{Constants.expoConfig?.version}</Text>
           </View>
 
+          <View style={styles.activeCampaigns}>
+            <Text style={styles.activeCampaignsTitle}>Active Campaigns</Text>
+            {activeCampaigns?.map(c => (
+              <ActiveCampaignRow key={c.id} campaign={c} />
+            ))}
+          </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -198,6 +213,24 @@ function ValueProp({ text }: { text: string }) {
     <View style={styles.valuePropRow}>
       <Text style={styles.valuePropIcon}>●</Text>
       <Text style={styles.valuePropText}>{text}</Text>
+    </View>
+  );
+}
+
+function ActiveCampaignRow({ campaign }: { campaign: Campaign }) {
+  const percent = usdcPercent(campaign.total_raised_wei, campaign.goal_wei);
+  const raised = formatUsdc(campaign.total_raised_wei);
+  const goal = formatUsdc(campaign.goal_wei);
+
+  return (
+    <View style={styles.campaignRow}>
+      <Text style={styles.campaignName}>
+        {campaign.name} <Text style={styles.campaignId}>#{campaign.on_chain_id}</Text>
+      </Text>
+      <View style={styles.campaignProgressBar}>
+        <View style={[styles.campaignProgressFill, { width: `${percent}%` as any }]} />
+      </View>
+      <Text style={styles.campaignMeta}>{raised} of {goal} · {percent}%</Text>
     </View>
   );
 }
@@ -364,5 +397,47 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.text.muted,
     textAlign: 'center',
+  },
+  activeCampaigns: {
+    marginTop: 32,
+    gap: 12,
+  },
+  activeCampaignsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text.primary,
+    marginBottom: 4,
+  },
+  campaignRow: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    gap: 6,
+  },
+  campaignName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text.primary,
+  },
+  campaignId: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: Colors.text.muted,
+  },
+  campaignProgressBar: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.border,
+    overflow: 'hidden',
+  },
+  campaignProgressFill: {
+    height: '100%',
+    backgroundColor: Colors.teal,
+  },
+  campaignMeta: {
+    fontSize: 12,
+    color: Colors.text.secondary,
   },
 });
