@@ -35,6 +35,12 @@ export interface Campaign {
   deadline: string | null;
   created_at: string;
   updated_at: string;
+  // Derived by the backend from the beneficiary's registered email (never
+  // the full email — see backend app/utils/display.py); falls back to the
+  // shortened wallet address when no email is on file yet.
+  recipient_name: string;
+  recipient_initials: string;
+  donor_count: number;
 }
 
 // ─── Campaign endpoints ───────────────────────────────────────────────────────
@@ -140,6 +146,10 @@ export interface DonationRecord {
   block_timestamp: string;
   block_number: number;
   created_at: string;
+  // Derived by the backend from the donor's registered email — see
+  // Campaign.recipient_name above for the same pattern.
+  donor_name: string;
+  donor_initials: string;
 }
 
 // The backend's on-chain event listener indexes donations asynchronously
@@ -195,6 +205,10 @@ export interface ImpactUpdateRecord {
   media_url: string | null;
   media_type: 'image' | 'video' | null;
   created_at: string;
+  // Derived by the backend from this update's campaign's beneficiary email
+  // — see Campaign.recipient_name above for the same pattern.
+  beneficiary_name: string;
+  beneficiary_initials: string;
 }
 
 export async function fetchImpactUpdates(params: {

@@ -13,8 +13,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { Colors } from '../../constants/colors';
-import { fetchCampaigns, fetchDonations, fetchImpactUpdates } from '../../lib/api';
-import { formatUsdc, formatTimeAgo, shortenAddress } from '../../lib/format';
+import { fetchCampaigns, fetchDonations, fetchImpactUpdates, fetchUser } from '../../lib/api';
+import { formatUsdc, formatTimeAgo, formatMonthYear, shortenAddress } from '../../lib/format';
 import { getWalletAddress } from '../../lib/blockchain';
 import {
   Avatar,
@@ -35,6 +35,16 @@ export default function DonorDashboard() {
   // different signed-in account and returning to this tab keeps showing
   // the previous account's wallet/donations.
   useFocusEffect(useCallback(() => { getWalletAddress().then(setWalletAddress); }, []));
+
+  // Own account only — GET /users/{wallet_address} is auth-gated to self,
+  // so this only ever works for the signed-in donor's own wallet.
+  const { data: user } = useQuery({
+    queryKey: ['user', walletAddress],
+    queryFn: () => fetchUser(walletAddress!),
+    enabled: !!walletAddress,
+    retry: false,
+  });
+  const emailLocalPart = user?.email ? user.email.split('@')[0] : null;
 
   const { data: campaigns, isLoading: campaignsLoading, isError: campaignsError } = useQuery({
     queryKey: ['campaigns'],
@@ -102,12 +112,20 @@ export default function DonorDashboard() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Avatar initials={walletAddress ? walletAddress.slice(2, 4).toUpperCase() : '—'} color={Colors.teal} size={40} />
+          <Avatar
+            initials={emailLocalPart ? emailLocalPart.slice(0, 2).toUpperCase() : (walletAddress ? walletAddress.slice(2, 4).toUpperCase() : '—')}
+            color={Colors.teal}
+            size={40}
+          />
           <View>
-            <Text style={styles.headerRole}>Donor dashboard</Text>
+            <Text style={styles.headerRole}>{emailLocalPart ?? 'Donor dashboard'}</Text>
             {walletAddress ? (
               <TouchableOpacity onPress={handleCopyAddress}>
-                <Text style={styles.walletAddress}>Wallet: {shortenAddress(walletAddress)}  ⧉</Text>
+                <Text style={styles.walletAddress}>
+                  Wallet: {shortenAddress(walletAddress)}
+                  {user ? ` · member since ${formatMonthYear(user.created_at)}` : ''}
+                  {'  ⧉'}
+                </Text>
               </TouchableOpacity>
             ) : null}
           </View>

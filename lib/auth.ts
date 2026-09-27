@@ -83,15 +83,25 @@ async function tryMigrateLegacyWallet(email: string): Promise<string | null> {
   if (!legacyKey) return null;
 
   try {
-    // The backend can only look users up by wallet address, so derive the
-    // legacy key's address and check whose email it's actually registered to.
+    // Derive the legacy key's address and check whose email it's actually
+    // registered to. This runs before login (no JWT yet), so it can't use
+    // GET /users/{wallet_address} (auth-gated to self as of 2026-09-27, to
+    // stop wallet addresses — already public on-chain — from being paired
+    // with a full email). check-wallet-email confirms the match without
+    // ever returning the registered email.
     const { address } = await getSmartAccountClient(legacyKey);
-    const { fetchUser } = await import('./api');
-    const registeredUser = await fetchUser(address);
-    if (registeredUser.email?.toLowerCase() === email.toLowerCase()) {
-      await SecureStore.setItemAsync(walletKeyFor(email), legacyKey);
-      await SecureStore.deleteItemAsync(WALLET_KEY_PREFIX);
-      return legacyKey;
+    const res = await fetch(`${API}/auth/check-wallet-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet_address: address, email }),
+    });
+    if (res.ok) {
+      const { matches } = await res.json();
+      if (matches) {
+        await SecureStore.setItemAsync(walletKeyFor(email), legacyKey);
+        await SecureStore.deleteItemAsync(WALLET_KEY_PREFIX);
+        return legacyKey;
+      }
     }
   } catch {
     // No user registered for this wallet yet, or a network error — leave
