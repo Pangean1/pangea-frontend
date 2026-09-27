@@ -46,9 +46,9 @@ export interface IncomingDonation {
 export function donationRecordToIncomingRow(d: DonationRecord, campaignName: string): IncomingDonation {
   return {
     id: d.id,
-    donorInitials: d.donor_address.slice(2, 4).toUpperCase(),
+    donorInitials: d.donor_initials,
     donorColor: Colors.teal,
-    donorLabel: shortenAddress(d.donor_address),
+    donorLabel: d.donor_name,
     campaign: campaignName,
     amount: formatUsdc(d.amount_wei),
     time: formatTimeAgo(d.block_timestamp),
@@ -75,6 +75,7 @@ export default function RecipientDashboard() {
     enabled: !!walletAddress,
     retry: false,
   });
+  const emailLocalPart = user?.email ? user.email.split('@')[0] : null;
 
   const { data: incomingDonationsData } = useQuery({
     queryKey: ['donations', 'recipient', walletAddress],
@@ -171,12 +172,16 @@ export default function RecipientDashboard() {
 
         {/* Header */}
         <View style={styles.header}>
-          <Avatar initials={walletAddress ? walletAddress.slice(2, 4).toUpperCase() : '—'} color={Colors.warning} size={40} />
+          <Avatar
+            initials={emailLocalPart ? emailLocalPart.slice(0, 2).toUpperCase() : (walletAddress ? walletAddress.slice(2, 4).toUpperCase() : '—')}
+            color={Colors.warning}
+            size={40}
+          />
           <View>
-            <Text style={styles.headerName}>Beneficiary</Text>
+            <Text style={styles.headerName}>{emailLocalPart ?? 'Beneficiary'}</Text>
             <TouchableOpacity onPress={handleCopyAddress} disabled={!walletAddress}>
               <Text style={styles.headerRole}>
-                {walletAddress ? shortenAddress(walletAddress) : '—'}
+                {walletAddress ? `Wallet: ${shortenAddress(walletAddress)}` : '—'}
                 {user ? ` · member since ${formatMonthYear(user.created_at)}` : ''}
                 {walletAddress ? '  ⧉' : ''}
               </Text>

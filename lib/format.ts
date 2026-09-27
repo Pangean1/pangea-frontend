@@ -24,6 +24,23 @@ export function formatMonthYear(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+// Used on campaign cards (Changes1.txt items 1f/1g) to show how long until a
+// campaign's deadline. Returns null when there's no deadline set at all (8 of
+// 15 campaigns as of 2026-09-27) so callers can hide the line entirely rather
+// than show a misleading date.
+export function formatTimeLeft(deadline: string | null): string | null {
+  if (!deadline) return null;
+  const diffMs = new Date(deadline).getTime() - Date.now();
+  if (diffMs <= 0) return 'Deadline passed';
+  const days = Math.ceil(diffMs / 86_400_000);
+  if (days === 1) return '1 day left';
+  if (days < 30) return `${days} days left`;
+  const months = Math.round(days / 30.44);
+  if (months < 12) return `${months} month${months === 1 ? '' : 's'} left`;
+  const years = Math.round(days / 365.25);
+  return `${years} year${years === 1 ? '' : 's'} left`;
+}
+
 export function formatTimeAgo(isoDate: string): string {
   const diffMs = Date.now() - new Date(isoDate).getTime();
   const minutes = Math.floor(diffMs / 60_000);

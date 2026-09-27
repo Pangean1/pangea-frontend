@@ -12,7 +12,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../../constants/colors';
 import { fetchCampaign } from '../../../lib/api';
-import { formatUsdc, usdcPercent, shortenAddress } from '../../../lib/format';
+import { formatUsdc, usdcPercent, shortenAddress, formatTimeLeft } from '../../../lib/format';
 
 export default function CampaignDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -53,8 +53,12 @@ export default function CampaignDetail() {
           <View style={styles.header}>
             <Text style={styles.name}>{campaign.name}</Text>
             <View style={styles.recipientRow}>
-              <Text style={styles.recipientLabel}>Recipient wallet</Text>
+              <Text style={styles.recipientLabel}>wallet:</Text>
               <Text style={styles.recipientAddress}>{shortenAddress(campaign.recipient_address)}</Text>
+            </View>
+            <View style={styles.recipientRow}>
+              <Text style={styles.recipientLabel}>Beneficiary:</Text>
+              <Text style={styles.recipientAddress}>{campaign.recipient_name}</Text>
             </View>
           </View>
 
@@ -130,6 +134,11 @@ function ProgressSection({ campaign }: { campaign: ReturnType<typeof fetchCampai
       </View>
 
       <Text style={styles.percentText}>{percent}% funded</Text>
+      <Text style={styles.percentText}>
+        {[formatTimeLeft(campaign.deadline), `${campaign.donor_count} donor${campaign.donor_count === 1 ? '' : 's'}`]
+          .filter(Boolean)
+          .join(' · ')}
+      </Text>
     </View>
   );
 }

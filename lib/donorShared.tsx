@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Colors } from '../constants/colors';
-import { formatUsdc, usdcPercent, shortenAddress, formatTimeAgo } from './format';
+import { formatUsdc, usdcPercent, shortenAddress, formatTimeAgo, formatTimeLeft } from './format';
 import type { Campaign, DonationRecord, ImpactUpdateRecord } from './api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,8 +52,8 @@ export function donationRecordToRow(d: DonationRecord, campaignName: string): Do
 export function impactUpdateRecordToCard(u: ImpactUpdateRecord, campaignName: string): ImpactUpdate {
   return {
     id: u.id,
-    initials: 'B',
-    name: 'Beneficiary',
+    initials: u.beneficiary_initials,
+    name: u.beneficiary_name,
     time: formatTimeAgo(u.created_at),
     message: u.message,
     mediaUrl: u.media_url ?? undefined,
@@ -124,6 +124,8 @@ export function CampaignRow({ item }: { item: Campaign }) {
   const raised = formatUsdc(item.total_raised_wei);
   const goal = formatUsdc(item.goal_wei);
   const barColor = percent >= 60 ? Colors.warning : Colors.teal;
+  const timeLeft = formatTimeLeft(item.deadline);
+  const donorsLabel = `${item.donor_count} donor${item.donor_count === 1 ? '' : 's'}`;
 
   return (
     <TouchableOpacity
@@ -134,12 +136,16 @@ export function CampaignRow({ item }: { item: Campaign }) {
       <Text style={shared.campaignTitle}>
         {item.name} <Text style={shared.campaignId}>#{item.on_chain_id}</Text>
       </Text>
-      <Text style={shared.campaignBy}>{shortenAddress(item.recipient_address)}</Text>
+      <Text style={shared.campaignBy}>wallet: {shortenAddress(item.recipient_address)}</Text>
+      <Text style={shared.campaignBy}>Beneficiary: {item.recipient_name}</Text>
       <View style={shared.progressBar}>
         <View style={[shared.progressFill, { width: `${percent}%` as any, backgroundColor: barColor }]} />
       </View>
       <Text style={shared.campaignMeta}>
         {raised} of {goal} · {percent}%
+      </Text>
+      <Text style={shared.campaignMeta}>
+        {[timeLeft, donorsLabel].filter(Boolean).join(' · ')}
       </Text>
     </TouchableOpacity>
   );
