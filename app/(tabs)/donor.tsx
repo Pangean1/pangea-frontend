@@ -91,9 +91,11 @@ export default function DonorDashboard() {
   });
 
   // Stage 5 ("Impact confirmed") only checks once the beneficiary has
-  // actually posted an update for the latest donation's campaign.
-  const latestDonationConfirmed = (impactUpdatesData?.items ?? []).some(
-    u => u.campaign_id === latestDonation?.campaign_id
+  // actually posted an update for the latest donation's campaign *after*
+  // that donation — an older update says nothing about this donation.
+  const latestDonationConfirmed = !!latestDonation && (impactUpdatesData?.items ?? []).some(
+    u => u.campaign_id === latestDonation.campaign_id
+      && new Date(u.created_at).getTime() > new Date(latestDonation.block_timestamp).getTime()
   );
 
   function handleBack() {
