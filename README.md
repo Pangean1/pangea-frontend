@@ -166,9 +166,10 @@ Then scan the QR code with the Expo Go app on your phone.
 | `wagmi` | ^3.6.0 | React hooks for Ethereum |
 | `viem` | ^2.47.6 | Low-level Ethereum client |
 | `expo-crypto` | ~15.0.9 | Generates the per-account embedded wallet key |
-| `expo-secure-store` | ^56.0.4 | Stores the JWT and wallet private key on-device |
-| `expo-notifications` | ~0.32.17 | Firebase push notifications |
+| `expo-secure-store` | ~15.0.8 | Stores the JWT and wallet private key on-device |
 | `babel-preset-expo` | ~54.0.10 | Babel config (pinned — required for Expo SDK 54) |
+
+Notifications (donation received, campaign impact update) are delivered **by email** from the backend — the app itself has no push-notification code. In-app push is planned later and needs `expo-notifications` plus a real `google-services.json` together (installing the package alone crashes the Android build on launch).
 
 ---
 
